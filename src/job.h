@@ -26,5 +26,4 @@ struct Job {
           error(""),
           status(JobStatus::Pending),
           exit_code(-1) {}
-
 };
