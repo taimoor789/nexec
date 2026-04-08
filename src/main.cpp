@@ -6,14 +6,19 @@ int main() {
     JobManager manager;
     Executor executor;
 
-    int id = manager.submit("int main() { return 0; }", "cpp");
+    int id = manager.submit(
+        "#include <iostream>\nint main() { std::cout << \"hello from nexec!\" << std::endl; return 0; }",
+        "cpp"
+    );
+
     Job& job = manager.get(id);
 
     std::string source_path = executor.write_source(job);
-    std::cout << "Source written to: " << source_path << std::endl;
-
     std::string binary_path = executor.compile(source_path, id);
-    std::cout << "Compiled to: " << binary_path << std::endl;
+    RunResult result = executor.run(binary_path, id);
+
+    std::cout << "Output: " << result.output << std::endl;
+    std::cout << "Exit code: " << result.exit_code << std::endl;
 
     return 0;
 }
