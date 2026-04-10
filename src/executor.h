@@ -98,6 +98,7 @@ public:
             std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
             _exit(1);
         }
+
         //parent process
         else {
             close(outpipe[1]);
