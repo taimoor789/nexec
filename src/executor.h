@@ -1,15 +1,45 @@
 #include <iostream>
 #include <fstream>
 #include "job.h"
-#include <format>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sched.h>
+#include <cstring>
 
 struct RunResult {
     std::string output;
     std::string error;
     int exit_code;
 };
+
+struct ChildArgs {
+    std::string binary_path;
+    int outpipe[2];
+    int errpipe[2];
+};
+
+int child_fn(void* arg) {
+    ChildArgs* args = static_cast<ChildArgs*>(arg);
+
+    close(args->outpipe[0]);
+    close(args->errpipe[0]);
+
+    //stdout to outpipe's write end
+    dup2(args->outpipe[1], STDOUT_FILENO);
+    //stederr to errpipe's write end
+    dup2(args->errpipe[1], STDERR_FILENO);
+
+    close(args->outpipe[1]);
+    close(args->errpipe[1]);
+
+    char* exec_args[] = {(char*)args->binary_path.c_str(), NULL};
+
+    //replaces the current process with a new one
+    int status = execvp(args->binary_path.c_str(), exec_args);
+    std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
+    _exit(1);
+}
+
 
 class Executor {
 
@@ -65,38 +95,29 @@ public:
     }
 
     RunResult run(const std::string& binary_path, int job_id) {
+        const int STACK_SIZE = 1024 * 1024;
+        char* stack = new char[STACK_SIZE];
+
         int outpipe[2];
         int errpipe[2];
-
         if (pipe(outpipe) == -1 || pipe(errpipe) == -1) {
             perror("pipe() failed");
         }
 
-        pid_t pid = fork();
+        ChildArgs args;
+        args.binary_path = binary_path;
+        args.outpipe[0] = outpipe[0];
+        args.outpipe[1] = outpipe[1];
+        args.errpipe[0] = errpipe[0];
+        args.errpipe[1] = errpipe[1];
+
+
+        pid_t pid = clone(child_fn, stack + STACK_SIZE,
+                          CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
 
         if (pid == -1) {
             perror("fork failed");
             exit(EXIT_FAILURE);
-        }
-
-        if (pid == 0) {
-            close(outpipe[0]);
-            close(errpipe[0]);
-
-            //stdout to outpipe's write end
-            dup2(outpipe[1], STDOUT_FILENO);
-            //stederr to errpipe's write end
-            dup2(errpipe[1], STDERR_FILENO);
-
-            close(outpipe[1]);
-            close(errpipe[1]);
-
-            char* args[] = {(char*)binary_path.c_str(), NULL};
-
-            //replaces the current process with a new one
-            int status = execvp(binary_path.c_str(), args);
-            std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
-            _exit(1);
         }
 
         //parent process
