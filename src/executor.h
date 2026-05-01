@@ -111,7 +111,6 @@ public:
         args.errpipe[0] = errpipe[0];
         args.errpipe[1] = errpipe[1];
 
-
         pid_t pid = clone(child_fn, stack + STACK_SIZE,
                           CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
 
