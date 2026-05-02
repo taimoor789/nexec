@@ -7,8 +7,8 @@ int main() {
     Executor executor;
 
     int id = manager.submit(
-        "#include <iostream>\nint main() { std::cout << \"hello from nexec!\" << std::endl; return 0; }",
-        "cpp"
+    "#include <iostream>\nint main() { std::cout << \"hello from nexec!\" << std::endl; return 0; }",
+    "cpp"
     );
 
     Job& job = manager.get(id);
@@ -19,6 +19,7 @@ int main() {
 
     std::cout << "Output: " << result.output << std::endl;
     std::cout << "Exit code: " << result.exit_code << std::endl;
+    std::cout << "Error: " << result.error << std::endl;
 
     return 0;
 }
