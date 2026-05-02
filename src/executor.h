@@ -6,6 +6,8 @@
 #include <sched.h>
 #include <cstring>
 #include <signal.h>
+#include <seccomp.h>
+#include <chrono>
 
 struct RunResult {
     std::string output;
@@ -27,11 +29,25 @@ int child_fn(void* arg) {
 
     //stdout to outpipe's write end
     dup2(args->outpipe[1], STDOUT_FILENO);
-    //stederr to errpipe's write end
+    //stderr to errpipe's write end
     dup2(args->errpipe[1], STDERR_FILENO);
 
     close(args->outpipe[1]);
     close(args->errpipe[1]);
+
+    //Add a filter context - SCMP_ACT_ALLOW means allow everything by default
+    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
+
+    //Add rules for syscalls to be blocked
+    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(socket), 0);
+    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
+    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(execve), 0);
+
+    //Load the filter into the kernel
+    seccomp_load(ctx);
+
+    //Free the context
+    seccomp_release(ctx);
 
     char* exec_args[] = {(char*)args->binary_path.c_str(), NULL};
 
@@ -125,6 +141,22 @@ public:
             close(outpipe[1]);
             close(errpipe[1]);
 
+            int status;
+            auto start = std::chrono::steady_clock::now();
+            while (true) {
+                //suspend parent until child changes state
+                pid_t result = waitpid(pid, &status, WNOHANG);
+                if (result != 0) break; //child exited
+                auto elapsed = std::chrono::steady_clock::now() - start;
+                if (elapsed >= std::chrono::seconds(5)) {
+                    kill(pid, SIGKILL);
+                    waitpid(pid, &status, 0);
+                    delete[] stack;
+                    return RunResult{"", "Timeout: execution exceeded 5 seconds", -1};
+                }
+                usleep(10000);
+            }
+
             char out_buffer[128];
             char err_buffer[128];
             ssize_t outCount = read(outpipe[0], out_buffer, sizeof(out_buffer));
@@ -137,26 +169,9 @@ public:
             std::string out_str(out_buffer, outCount);
             std::string err_str(err_buffer, errCount);
 
-            int status;
-            auto start = std::chrono::steady_clock::now();
-            while (true) {
-                //suspend parent until child changes state
-                pid_t result = waitpid(pid, &status, WNOHANG);
-                if (result != 0) break; //child exited
-                auto elapsed = std::chrono::steady_clock::now() - start;
-                if (elapsed > std::chrono::seconds(5)) {
-                    kill(pid, SIGKILL);
-                    waitpid(pid, &status, 0);
-                    delete[] stack;
-                    return RunResult{"", "Timeout: execution exceeded 5 seconds", -1};
-                }
-                usleep(10000);
-            }
-
             if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
                 throw std::runtime_error("Compilation failed");
             }
-
             return RunResult{out_str, err_str, WEXITSTATUS(status)};
         }
     }
