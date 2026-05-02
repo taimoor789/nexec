@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <sched.h>
 #include <cstring>
+#include <signal.h>
 
 struct RunResult {
     std::string output;
@@ -137,10 +138,19 @@ public:
             std::string err_str(err_buffer, errCount);
 
             int status;
-            pid_t result = waitpid(pid, &status, 0);
-
-            if (result == -1) {
-                throw std::system_error(errno, std::generic_category(), "waitpid failed");
+            auto start = std::chrono::steady_clock::now();
+            while (true) {
+                //suspend parent until child changes state
+                pid_t result = waitpid(pid, &status, WNOHANG);
+                if (result != 0) break; //child exited
+                auto elapsed = std::chrono::steady_clock::now() - start;
+                if (elapsed > std::chrono::seconds(5)) {
+                    kill(pid, SIGKILL);
+                    waitpid(pid, &status, 0);
+                    delete[] stack;
+                    return RunResult{"", "Timeout: execution exceeded 5 seconds", -1};
+                }
+                usleep(10000);
             }
 
             if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
