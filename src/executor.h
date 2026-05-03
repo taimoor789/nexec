@@ -104,10 +104,23 @@ private:
     bool check_oom(int job_id) {
         namespace fs = std::filesystem;
         fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
+        fs::path memory_events = cgroup_path / "memory.events";
+        std::ifstream ifs(memory_events);
 
+        if (!ifs.is_open()) {
+            std::cerr << "Failed to open memory.events file" << std::endl;
+            return false;
+        }
 
-
+        int oom_kill;
+        ifs >> oom_kill;
+        if (oom_kill > 0) {
+            return true;
+        }
+        return false;
     }
+
+
 
 
 public:
