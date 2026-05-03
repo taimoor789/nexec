@@ -1,4 +1,6 @@
 #include <iostream>
+#include <filesystem>
+#include <system_error>
 #include <fstream>
 #include "job.h"
 #include <unistd.h>
@@ -41,7 +43,6 @@ int child_fn(void* arg) {
     //Add rules for syscalls to be blocked
     seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(socket), 0);
     seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
-    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(execve), 0);
 
     //Load the filter into the kernel
     seccomp_load(ctx);
@@ -59,6 +60,55 @@ int child_fn(void* arg) {
 
 
 class Executor {
+private:
+    int create_cgroup(int job_id) {
+        namespace fs = std::filesystem;
+        fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
+
+        try {
+            if (fs::create_directory(cgroup_path)) {
+                std::cout << "Cgroup created successfully: " << cgroup_path << std::endl;
+            } else {
+                std::cout << "Cgroup already exists" << cgroup_path << std::endl;
+            }
+        } catch (const fs::filesystem_error& e) {
+            std::cerr << "Error creating cgroup: " << e.what() << std::endl;
+            return 1;
+        }
+        fs::path memory_path = cgroup_path / "/memory.max";
+        std::ofstream ofs(memory_path);
+        if (!ofs) {
+            std::perror("Failed to open memory file");
+        }
+        ofs << 256000000;
+        ofs.close();
+
+        return 0;
+    }
+
+    int add_to_cgroup(int job_id, pid_t pid) {
+        namespace fs = std::filesystem;
+        fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
+        fs::path procs_path = cgroup_path / "cgroup.procs";
+
+        std::ofstream ofs(procs_path);
+        if (!ofs.is_open()) {
+            std::cerr << "Failed to open procs" << std::endl;
+            return 1;
+        }
+        ofs << std::to_string(pid);
+        ofs.close();
+        return 0;
+    }
+
+    bool check_oom(int job_id) {
+        namespace fs = std::filesystem;
+        fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
+
+
+
+    }
+
 
 public:
     std::string write_source(const Job& job) {
@@ -157,6 +207,14 @@ public:
                 usleep(10000);
             }
 
+            if (WIFSIGNALED(status)) {
+                return RunResult{"", "process killed by signal: " + std::to_string(WTERMSIG(status)), -1};
+            }
+
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                throw std::runtime_error("Compilation failed");
+            }
+
             char out_buffer[128];
             char err_buffer[128];
             ssize_t outCount = read(outpipe[0], out_buffer, sizeof(out_buffer));
@@ -169,9 +227,6 @@ public:
             std::string out_str(out_buffer, outCount);
             std::string err_str(err_buffer, errCount);
 
-            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                throw std::runtime_error("Compilation failed");
-            }
             return RunResult{out_str, err_str, WEXITSTATUS(status)};
         }
     }
