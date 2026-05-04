@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <seccomp.h>
 #include <chrono>
+#include <sys/resource.h>
 
 struct RunResult {
     std::string output;
@@ -50,6 +51,11 @@ int child_fn(void* arg) {
     //Free the context
     seccomp_release(ctx);
 
+    struct rlimit mem_limit;
+    mem_limit.rlim_cur = 256 * 1024 * 1024; //256mb soft limit
+    mem_limit.rlim_max = 256 * 1024 * 1024; //256mb hard limit
+    setrlimit(RLIMIT_AS, &mem_limit);
+
     char* exec_args[] = {(char*)args->binary_path.c_str(), NULL};
 
     //replaces the current process with a new one
@@ -62,6 +68,14 @@ int child_fn(void* arg) {
 class Executor {
 private:
     int create_cgroup(int job_id) {
+        std::ofstream subtree("/sys/fs/cgroup/cgroup.subtree_control");
+        if (!subtree) {
+            std::cerr << "Failed to open subtree_control" << std::endl;
+        } else {
+            subtree << "+memory";
+            subtree.close();
+        }
+
         namespace fs = std::filesystem;
         fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
 
@@ -75,7 +89,7 @@ private:
             std::cerr << "Error creating cgroup: " << e.what() << std::endl;
             return 1;
         }
-        fs::path memory_path = cgroup_path / "/memory.max";
+        fs::path memory_path = cgroup_path / "memory.max";
         std::ofstream ofs(memory_path);
         if (!ofs) {
             std::perror("Failed to open memory file");
@@ -112,21 +126,21 @@ private:
             return false;
         }
 
-        int oom_kill;
-        ifs >> oom_kill;
-        if (oom_kill > 0) {
-            return true;
+        std::string key;
+        int value;
+        while (ifs >> key >> value) {
+            if (key == "oom_kill" && value > 0) return true;
         }
         return false;
     }
 
     int cleanup_cgroup(int job_id) {
-        const char* cgroup_path = ("/sys/fs/cgroup/nexec_" + std::to_string(job_id)).c_str();
+        std::string path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
 
-        if (rmdir(cgroup_path) == 0) {
-            std::cout << "cgroup removed: " << cgroup_path << std::endl;
+        if (rmdir(path.c_str()) == 0) {
+            std::cout << "cgroup removed: " << path << std::endl;
         } else {
-            std::cout << "Failed to remove cgroup: " << cgroup_path << std::endl;
+            std::cerr << "Failed to remove cgroup: " << path << std::endl;
             return 1;
         }
         return 0;
@@ -205,15 +219,14 @@ public:
         pid_t pid = clone(child_fn, stack + STACK_SIZE,
                           CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
 
-        add_to_cgroup(job_id, pid);
-
         if (pid == -1) {
             perror("fork failed");
             exit(EXIT_FAILURE);
         }
-
         //parent process
         else {
+            add_to_cgroup(job_id, pid);
+
             close(outpipe[1]);
             close(errpipe[1]);
 
@@ -234,11 +247,21 @@ public:
             }
 
             if (check_oom(job_id)) {
-                std::cerr << "Out of memory Error" << std::endl;
+                cleanup_cgroup(job_id);
+                delete[] stack;
+                return RunResult{"", "Memory Limit Exceeded", -1};
             }
 
             if (WIFSIGNALED(status)) {
-                return RunResult{"", "process killed by signal: " + std::to_string(WTERMSIG(status)), -1};
+                int sig = WTERMSIG(status);
+                if (sig == SIGSEGV) {
+                    cleanup_cgroup(job_id);
+                    delete[] stack;
+                    return RunResult{"", "Memory limit exceeded", -1};
+                }
+                cleanup_cgroup(job_id);
+                delete[] stack;
+                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
             }
 
             if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
@@ -256,8 +279,6 @@ public:
 
             std::string out_str(out_buffer, outCount);
             std::string err_str(err_buffer, errCount);
-
-            cleanup_cgroup(job_id);
 
             return RunResult{out_str, err_str, WEXITSTATUS(status)};
         }
