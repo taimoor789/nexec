@@ -120,8 +120,17 @@ private:
         return false;
     }
 
+    int cleanup_cgroup(int job_id) {
+        const char* cgroup_path = ("/sys/fs/cgroup/nexec_" + std::to_string(job_id)).c_str();
 
-
+        if (rmdir(cgroup_path) == 0) {
+            std::cout << "cgroup removed: " << cgroup_path << std::endl;
+        } else {
+            std::cout << "Failed to remove cgroup: " << cgroup_path << std::endl;
+            return 1;
+        }
+        return 0;
+    }
 
 public:
     std::string write_source(const Job& job) {
@@ -191,8 +200,12 @@ public:
         args.errpipe[0] = errpipe[0];
         args.errpipe[1] = errpipe[1];
 
+        create_cgroup(job_id);
+
         pid_t pid = clone(child_fn, stack + STACK_SIZE,
                           CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
+
+        add_to_cgroup(job_id, pid);
 
         if (pid == -1) {
             perror("fork failed");
@@ -220,6 +233,10 @@ public:
                 usleep(10000);
             }
 
+            if (check_oom(job_id)) {
+                std::cerr << "Out of memory Error" << std::endl;
+            }
+
             if (WIFSIGNALED(status)) {
                 return RunResult{"", "process killed by signal: " + std::to_string(WTERMSIG(status)), -1};
             }
@@ -239,6 +256,8 @@ public:
 
             std::string out_str(out_buffer, outCount);
             std::string err_str(err_buffer, errCount);
+
+            cleanup_cgroup(job_id);
 
             return RunResult{out_str, err_str, WEXITSTATUS(status)};
         }
