@@ -70,9 +70,7 @@ class Executor {
 private:
     int create_cgroup(int job_id) {
         std::ofstream subtree("/sys/fs/cgroup/cgroup.subtree_control");
-        if (!subtree) {
-            std::cerr << "Failed to open subtree_control" << std::endl;
-        } else {
+        if (subtree) {
             subtree << "+memory";
             subtree.close();
         }
@@ -81,51 +79,38 @@ private:
         fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
 
         try {
-            if (fs::create_directory(cgroup_path)) {
-                std::cout << "Cgroup created successfully: " << cgroup_path << std::endl;
-            } else {
-                std::cout << "Cgroup already exists" << cgroup_path << std::endl;
-            }
+            fs::create_directory(cgroup_path);
         } catch (const fs::filesystem_error& e) {
-            std::cerr << "Error creating cgroup: " << e.what() << std::endl;
             return 1;
         }
+
         fs::path memory_path = cgroup_path / "memory.max";
         std::ofstream ofs(memory_path);
-        if (!ofs) {
-            std::perror("Failed to open memory file");
+        if (ofs) {
+            ofs << 256000000;
+            ofs.close();
         }
-        ofs << 256000000;
-        ofs.close();
 
         return 0;
     }
 
     int add_to_cgroup(int job_id, pid_t pid) {
         namespace fs = std::filesystem;
-        fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
-        fs::path procs_path = cgroup_path / "cgroup.procs";
+        fs::path procs_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id) + "/cgroup.procs";
 
         std::ofstream ofs(procs_path);
-        if (!ofs.is_open()) {
-            std::cerr << "Failed to open procs" << std::endl;
-            return 1;
+        if (ofs.is_open()) {
+            ofs << std::to_string(pid);
+            ofs.close();
         }
-        ofs << std::to_string(pid);
-        ofs.close();
         return 0;
     }
 
     bool check_oom(int job_id) {
         namespace fs = std::filesystem;
-        fs::path cgroup_path = "/sys/fs/cgroup/nexec_" + std::to_string(job_id);
-        fs::path memory_events = cgroup_path / "memory.events";
+        fs::path memory_events = "/sys/fs/cgroup/nexec_" + std::to_string(job_id) + "/memory.events";
         std::ifstream ifs(memory_events);
-
-        if (!ifs.is_open()) {
-            std::cerr << "Failed to open memory.events file" << std::endl;
-            return false;
-        }
+        if (!ifs.is_open()) return false;
 
         std::string key;
         int value;
