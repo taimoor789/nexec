@@ -1,9 +1,11 @@
+#pragma once
 #include <queue>
 #include <seccomp.h>
 #include <thread>
 #include "executor.h"
 #include "job_manager.h"
-
+#include <condition_variable>
+#include <mutex>
 
 class ThreadPool {
 private:

@@ -1,5 +1,5 @@
+#pragma once
 #include <vector>
-
 #include "job.h"
 
 class JobManager {
