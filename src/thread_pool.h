@@ -29,15 +29,19 @@ private:
 
             lock.unlock();
 
-            Job& job = job_manager.get(job_id);
-            std::string source_path = executor.write_source(job);
-            std::string binary_path = executor.compile(source_path, job_id);
-            RunResult result = executor.run(binary_path, job_id);
+            try {
+                Job& job = job_manager.get(job_id);
+                std::string source_path = executor.write_source(job);
+                std::string binary_path = executor.compile(source_path, job_id);
+                RunResult result = executor.run(binary_path, job_id);
 
-            job.output = result.output;
-            job.error = result.error;
-            job.exit_code = result.exit_code;
-            job_manager.set_status(job_id, JobStatus::Done);
+                job.output = result.output;
+                job.error = result.error;
+                job.exit_code = result.exit_code;
+                job_manager.set_status(job_id, JobStatus::Done);
+            } catch (const std::exception& e) {
+                job_manager.set_status(job_id, JobStatus::Failed);
+            }
         }
     }
 
