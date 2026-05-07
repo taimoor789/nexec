@@ -1,25 +1,27 @@
 #include <iostream>
-#include "job_manager.h"
-#include "executor.h"
+#include "thread_pool.h"
 
 int main() {
     JobManager manager;
     Executor executor;
+    ThreadPool pool(manager, executor);
 
-    int id = manager.submit(
-    "#include <iostream>\nint main() { std::cout << \"hello from nexec!\" << std::endl; return 0; }",
-    "cpp"
-    );
+    pool.start();
 
-    Job& job = manager.get(id);
+    for (int i = 1; i < 9; i++) {
+        int id = manager.submit(
+            "#include <iostream>\nint main() { std::cout << \"hello from job " + std::to_string(i) + "\" << std::endl; return 0; }",
+            "cpp"
+        );
+        pool.submit(id);
+    }
 
-    std::string source_path = executor.write_source(job);
-    std::string binary_path = executor.compile(source_path, id);
-    RunResult result = executor.run(binary_path, id);
+    std::this_thread::sleep_for(std::chrono::seconds(15));
+    pool.stop();
 
-    std::cout << "Output: " << result.output << std::endl;
-    std::cout << "Exit code: " << result.exit_code << std::endl;
-    std::cout << "Error: " << result.error << std::endl;
+    for (const Job& job : manager.all()) {
+        std::cout << "Job " << job.id << ": " << job.output << std::endl;
+    }
 
     return 0;
 }
