@@ -65,7 +65,6 @@ int child_fn(void* arg) {
     _exit(1);
 }
 
-
 class Executor {
 private:
     int create_cgroup(int job_id) {
