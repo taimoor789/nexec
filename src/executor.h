@@ -133,7 +133,17 @@ private:
 
 public:
     std::string write_source(const Job& job) {
-        std::string filename = "/tmp/nexec_" + std::to_string(job.id) + ".cpp";
+        std::string language = job.language;
+        std::string filename;
+        if (language == "cpp") {
+            filename = "/tmp/nexec_" + std::to_string(job.id) + ".cpp";
+        }
+        else if (language == "java") {
+            filename = "/tmp/nexec_" + std::to_string(job.id) + ".java";
+        }
+        else {
+            filename = "/tmp/nexec_" + std::to_string(job.id) + ".py";
+        }
         std::ofstream code_file(filename);
         code_file << job.source_code << std::endl;
         code_file.close();
