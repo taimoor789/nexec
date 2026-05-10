@@ -31,9 +31,10 @@ private:
 
             try {
                 Job& job = job_manager.get(job_id);
+                std::string language = job.language;
                 std::string source_path = executor.write_source(job);
-                std::string binary_path = executor.compile(source_path, job_id);
-                RunResult result = executor.run(binary_path, job_id);
+                std::string binary_path = executor.compile(source_path, job_id, language);
+                RunResult result = executor.run(binary_path, job_id, language);
 
                 job.output = result.output;
                 job.error = result.error;
