@@ -21,6 +21,7 @@ struct RunResult {
 
 struct ChildArgs {
     std::string binary_path;
+    std::string language;
     int outpipe[2];
     int errpipe[2];
 };
@@ -57,10 +58,24 @@ int child_fn(void* arg) {
     mem_limit.rlim_max = 256 * 1024 * 1024; //256mb hard limit
     setrlimit(RLIMIT_AS, &mem_limit);
 
-    char* exec_args[] = {(char*)args->binary_path.c_str(), NULL};
-
-    //replaces the current process with a new one
-    int status = execvp(args->binary_path.c_str(), exec_args);
+    char* exec_args[5];
+    if (args->language == "python") {
+        exec_args[0] = (char*)"python3";
+        exec_args[1] = (char*)args->binary_path.c_str();
+        exec_args[2] = NULL;
+        execvp("python3", exec_args);
+    } else if (args->language == "java") {
+        exec_args[0] = (char*)"java";
+        exec_args[1] = (char*)"-cp";
+        exec_args[2] = (char*)"/tmp";
+        exec_args[3] = (char*)args->binary_path.c_str();
+        exec_args[4] = NULL;
+        execvp("java", exec_args);
+    } else {
+        exec_args[0] = (char*)args->binary_path.c_str();
+        exec_args[1] = NULL;
+        execvp(args->binary_path.c_str(), exec_args);
+    }
     std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
     _exit(1);
 }
@@ -150,49 +165,90 @@ public:
         return filename;
     }
 
-    std::string compile(const std::string& source_path, int job_id) {
+    std::string compile(const std::string& source_path, int job_id, const std::string& language) {
+        if (language == "python") {
+            return source_path;
+        }
         std::string binary_path = "/tmp/nexec_" + std::to_string(job_id);
 
-        char* args[] = {
-            (char*)"g++",
-            (char*)"-o",
-            (char*)binary_path.c_str(),
-            (char*)source_path.c_str(),
-            NULL
-        };
-        const char* command = "g++";
+        if (language == "cpp") {
+            char* args[] = {
+                (char*)"g++",
+                (char*)"-o",
+                (char*)binary_path.c_str(),
+                (char*)source_path.c_str(),
+                NULL
+            };
+            const char* command = "g++";
 
-        pid_t c_pid = fork();
+            pid_t c_pid = fork();
 
-        if (c_pid == -1) {
-            perror("fork failed");
-            exit(EXIT_FAILURE);
-        }
-         //child process
-         if (c_pid == 0) {
-            //replaces the current process with a new one
-            int status_code = execvp(command, args);
-
-            std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
-            _exit(1);
-        }
-        else {
-            int status;
-            //wait for child process result
-            pid_t result = waitpid(c_pid, &status, 0);
-
-            if (result == -1) {
-                throw std::system_error(errno, std::generic_category(), "waitpid failed");
+            if (c_pid == -1) {
+                perror("fork failed");
+                exit(EXIT_FAILURE);
             }
+            //child process
+            if (c_pid == 0) {
+                //replaces the current process with a new one
+                int status_code = execvp(command, args);
 
-            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                throw std::runtime_error("Compilation failed");
+                std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
+                _exit(1);
             }
+            else {
+                int status;
+                //wait for child process result
+                pid_t result = waitpid(c_pid, &status, 0);
+
+                if (result == -1) {
+                    throw std::system_error(errno, std::generic_category(), "waitpid failed");
+                }
+
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                    throw std::runtime_error("Compilation failed");
+                }
+            }
+            return binary_path;
+        } else if (language == "java") {
+            char* args[] = {
+                (char*)"javac",
+                (char*)source_path.c_str(),
+                NULL
+            };
+            const char* command = "javac";
+
+            pid_t c_pid = fork();
+
+            if (c_pid == -1) {
+                perror("fork failed");
+                exit(EXIT_FAILURE);
+            }
+            //child process
+            if (c_pid == 0) {
+                //replaces the current process with a new one
+                int status_code = execvp(command, args);
+
+                std::cerr << "execvp() failed: " << strerror(errno) << std::endl;
+                _exit(1);
+            }
+            else {
+                int status;
+                //wait for child process result
+                pid_t result = waitpid(c_pid, &status, 0);
+
+                if (result == -1) {
+                    throw std::system_error(errno, std::generic_category(), "waitpid failed");
+                }
+
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                    throw std::runtime_error("Compilation failed");
+                }
+            }
+            return "/tmp";
         }
-        return binary_path;
     }
 
-    RunResult run(const std::string& binary_path, int job_id) {
+    RunResult run(const std::string& binary_path, int job_id, const std::string& language) {
         const int STACK_SIZE = 1024 * 1024;
         char* stack = new char[STACK_SIZE];
 
