@@ -22,6 +22,7 @@ struct RunResult {
 struct ChildArgs {
     std::string binary_path;
     std::string language;
+    int job_id;
     int outpipe[2];
     int errpipe[2];
 };
@@ -40,38 +41,42 @@ int child_fn(void* arg) {
     close(args->outpipe[1]);
     close(args->errpipe[1]);
 
-    //Add a filter context - SCMP_ACT_ALLOW means allow everything by default
-    scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
+    if (args->language != "java") {
+        //Add a filter context SCMP_ACT_ALLOW means allow everything by default
+        scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
 
-    //Add rules for syscalls to be blocked
-    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(socket), 0);
-    seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
+        //Add rules for syscalls to be blocked
+        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(socket), 0);
+        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
 
-    //Load the filter into the kernel
-    seccomp_load(ctx);
+        //Load the filter into the kernel
+        seccomp_load(ctx);
 
-    //Free the context
-    seccomp_release(ctx);
-
-    struct rlimit mem_limit;
-    mem_limit.rlim_cur = 256 * 1024 * 1024; //256mb soft limit
-    mem_limit.rlim_max = 256 * 1024 * 1024; //256mb hard limit
-    setrlimit(RLIMIT_AS, &mem_limit);
+        //Free the context
+        seccomp_release(ctx);
+    }
 
     char* exec_args[5];
     if (args->language == "python") {
-        exec_args[0] = (char*)"python3";
-        exec_args[1] = (char*)args->binary_path.c_str();
-        exec_args[2] = NULL;
-        execvp("python3", exec_args);
+        exec_args[0] = (char*)"/usr/bin/python3";
+        exec_args[1] = (char*)"-u";
+        exec_args[2] = (char*)args->binary_path.c_str();
+        exec_args[3] = NULL;
+        execvp("/usr/bin/python3", exec_args);
     } else if (args->language == "java") {
-        exec_args[0] = (char*)"java";
+        std::string class_name = "nexec_" + std::to_string(args->job_id);
+        exec_args[0] = (char*)"/usr/bin/java";
         exec_args[1] = (char*)"-cp";
         exec_args[2] = (char*)"/tmp";
-        exec_args[3] = (char*)args->binary_path.c_str();
+        exec_args[3] = (char*)class_name.c_str();
         exec_args[4] = NULL;
-        execvp("java", exec_args);
+        execvp("/usr/bin/java", exec_args);
     } else {
+        struct rlimit mem_limit;
+        mem_limit.rlim_cur = 256 * 1024 * 1024; //256mb soft limit
+        mem_limit.rlim_max = 256 * 1024 * 1024; //256mb hard limit
+        setrlimit(RLIMIT_AS, &mem_limit);
+
         exec_args[0] = (char*)args->binary_path.c_str();
         exec_args[1] = NULL;
         execvp(args->binary_path.c_str(), exec_args);
@@ -154,7 +159,17 @@ public:
             filename = "/tmp/nexec_" + std::to_string(job.id) + ".cpp";
         }
         else if (language == "java") {
-            filename = "/tmp/nexec_" + std::to_string(job.id) + ".java";
+            std::string class_name = "nexec_" + std::to_string(job.id);
+            filename = "/tmp/" + class_name + ".java";
+            std::string source = job.source_code;
+            size_t pos = source.find("NEXEC_CLASS");
+            if (pos != std::string::npos) {
+                source.replace(pos, 11, class_name);
+            }
+            std::ofstream code_file(filename);
+            code_file << source << std::endl;
+            code_file.close();
+            return filename;  //early return
         }
         else {
             filename = "/tmp/nexec_" + std::to_string(job.id) + ".py";
@@ -246,6 +261,7 @@ public:
             }
             return "/tmp";
         }
+        throw std::runtime_error("Unsupported language: " + language);
     }
 
     RunResult run(const std::string& binary_path, int job_id, const std::string& language) {
@@ -260,6 +276,8 @@ public:
 
         ChildArgs args;
         args.binary_path = binary_path;
+        args.language = language;
+        args.job_id = job_id;
         args.outpipe[0] = outpipe[0];
         args.outpipe[1] = outpipe[1];
         args.errpipe[0] = errpipe[0];
@@ -268,7 +286,7 @@ public:
         create_cgroup(job_id);
 
         pid_t pid = clone(child_fn, stack + STACK_SIZE,
-                          CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
+                  CLONE_NEWPID | CLONE_NEWNS | SIGCHLD, &args);
 
         if (pid == -1) {
             perror("fork failed");
@@ -315,21 +333,23 @@ public:
                 return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
             }
 
-            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                throw std::runtime_error("Compilation failed");
-            }
-
             char out_buffer[128];
             char err_buffer[128];
             ssize_t outCount = read(outpipe[0], out_buffer, sizeof(out_buffer));
             ssize_t errCount = read(errpipe[0], err_buffer, sizeof(err_buffer));
 
-            if (outCount == -1 || errCount == -1) {
-                perror("read() failed");
+            std::string out_str(outCount > 0 ? std::string(out_buffer, outCount) : "");
+            std::string err_str(errCount > 0 ? std::string(err_buffer, errCount) : "");
+
+            if (WIFSIGNALED(status)) {
+                int sig = WTERMSIG(status);
+                if (sig == SIGSEGV) return RunResult{"", "Memory limit exceeded", -1};
+                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
             }
 
-            std::string out_str(out_buffer, outCount);
-            std::string err_str(err_buffer, errCount);
+            if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                return RunResult{"", err_str, WEXITSTATUS(status)};
+            }
 
             return RunResult{out_str, err_str, WEXITSTATUS(status)};
         }
