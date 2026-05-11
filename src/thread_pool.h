@@ -41,6 +41,7 @@ private:
                 job.exit_code = result.exit_code;
                 job_manager.set_status(job_id, JobStatus::Done);
             } catch (const std::exception& e) {
+                job_manager.get(job_id).error = e.what();
                 job_manager.set_status(job_id, JobStatus::Failed);
             }
         }
