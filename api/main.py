@@ -2,8 +2,12 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import subprocess
 import json
+import threading
 
 app = FastAPI()
+
+job_counter = 0
+counter_lock = threading.Lock()
 
 class SubmitRequest(BaseModel):
     source_code: str
@@ -11,21 +15,28 @@ class SubmitRequest(BaseModel):
 
 @app.post("/submit")
 def submit(request: SubmitRequest):
-    job_id = 1
+    global job_counter
+    with counter_lock:
+        job_counter += 1
+        job_id = job_counter
+
     extensions = {"cpp": ".cpp", "python": ".py", "java": ".java"}
     temp_file = f"/tmp/nexec_{job_id}{extensions[request.language]}"
 
     with open(temp_file, "w") as f:
         f.write(request.source_code)
 
-    result = subprocess.run(
-        ["./nexec", "--language", request.language, "--job-id", job_id, "--source", temp_file],
-        capture_output=True,
-        text=True
-    )
+    try:
+        result = subprocess.run(
+            ["./nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
+            capture_output=True,
+            text=True
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     if result.returncode != 0:
-        raise HTTPException(status_code=result.returncode)
+        raise HTTPException(status_code=500, detail=f"Execution failed with exit code {result.returncode}")
 
     data = json.loads(result.stdout)
     return data
