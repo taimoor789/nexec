@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import subprocess
 import json
@@ -12,6 +13,10 @@ counter_lock = threading.Lock()
 class SubmitRequest(BaseModel):
     source_code: str
     language: str
+
+@app.get("/")
+def index():
+    return FileResponse("index.html")
 
 @app.post("/submit")
 def submit(request: SubmitRequest):
