@@ -228,7 +228,38 @@
     });
 
     async function handleRun() {
+        const code = editor.getValue();
+        const language = document.getElementById("language-select").value;
 
+        const button = document.getElementById("run-btn");
+        button.textContent = "Running...";
+        button.disabled = true;
+
+        try {
+
+            const response = await fetch("/submit", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({source_code: code, language: language})
+            });
+            const data = await response.json();
+
+            const output = document.getElementById("output-text");
+            const status = document.getElementById("status-badge");
+
+            status.textContent = data.exit_code === 0 ? "Done" : "Error";
+            status.className = data.exit_code === 0 ? "success" : "error";
+
+            if (data.error) {
+                output.textContent = data.error;
+            }
+            if (data.output) {
+                output.textContent = data.output;
+            }
+        } finally {
+            button.textContent = "▶ Run";
+            button.disabled = false;
+        }
     }
 </script>
 
