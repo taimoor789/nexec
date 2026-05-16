@@ -4,6 +4,5 @@ cmake-build-release/
 *.o
 *.out
 nexec
-Dockerfile.
 Dockerfile
 docker-compose.yml
