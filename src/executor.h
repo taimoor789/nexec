@@ -333,13 +333,13 @@ public:
                 return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
             }
 
-            char out_buffer[128];
-            char err_buffer[128];
-            ssize_t outCount = read(outpipe[0], out_buffer, sizeof(out_buffer));
-            ssize_t errCount = read(errpipe[0], err_buffer, sizeof(err_buffer));
-
-            std::string out_str(outCount > 0 ? std::string(out_buffer, outCount) : "");
-            std::string err_str(errCount > 0 ? std::string(err_buffer, errCount) : "");
+            std::string out_str, err_str;
+            char buf[4096];
+            ssize_t n;
+            while ((n = read(outpipe[0], buf, sizeof(buf))) > 0)
+                out_str.append(buf, n);
+            while ((n = read(errpipe[0], buf, sizeof(buf))) > 0)
+                err_str.append(buf, n);
 
             if (WIFSIGNALED(status)) {
                 int sig = WTERMSIG(status);
