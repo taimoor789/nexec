@@ -236,6 +236,9 @@
         button.disabled = true;
 
         try {
+            output.textContent = "";
+            status.textContent = "running";
+            status.className = "running";
 
             const response = await fetch("/submit", {
                 method: "POST",
@@ -250,12 +253,7 @@
             status.textContent = data.exit_code === 0 ? "Done" : "Error";
             status.className = data.exit_code === 0 ? "success" : "error";
 
-            if (data.error) {
-                output.textContent = data.error;
-            }
-            if (data.output) {
-                output.textContent = data.output;
-            }
+            output.textContent = data.error ? data.error : data.output;
         } finally {
             button.textContent = "▶ Run";
             button.disabled = false;
