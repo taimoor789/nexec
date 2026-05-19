@@ -33,7 +33,7 @@ def submit(request: SubmitRequest):
 
     try:
         result = subprocess.run(
-            ["./nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
+            ["/nexec/nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
             capture_output=True,
             text=True
         )
