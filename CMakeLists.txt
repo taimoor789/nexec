@@ -9,4 +9,4 @@ add_executable(nexec
         src/executor.h
         src/job_manager.h
         src/thread_pool.h
-        Dockerfile.)
+)
