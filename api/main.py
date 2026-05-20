@@ -31,17 +31,11 @@ def submit(request: SubmitRequest):
     with open(temp_file, "w") as f:
         f.write(request.source_code)
 
-    try:
         result = subprocess.run(
             ["/nexec/nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
             capture_output=True,
             text=True
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    if result.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"Execution failed with exit code {result.returncode}")
 
     data = json.loads(result.stdout)
     return data
