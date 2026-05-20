@@ -196,6 +196,9 @@ public:
             };
             const char* command = "g++";
 
+            int compile_err[2];
+            pipe(compile_err);
+
             pid_t c_pid = fork();
 
             if (c_pid == -1) {
@@ -204,6 +207,10 @@ public:
             }
             //child process
             if (c_pid == 0) {
+                dup2(compile_err[1], STDERR_FILENO);
+                close(compile_err[0]);
+                close(compile_err[1]);
+
                 //replaces the current process with a new one
                 int status_code = execvp(command, args);
 
@@ -215,22 +222,29 @@ public:
                 //wait for child process result
                 pid_t result = waitpid(c_pid, &status, 0);
 
-                if (result == -1) {
-                    throw std::system_error(errno, std::generic_category(), "waitpid failed");
-                }
+                close(compile_err[1]);
+                char ebuf[4096];
+                ssize_t n = read(compile_err[0], ebuf, sizeof(ebuf));
+                std::string compile_error(n > 0 ? std::string(ebuf, n) : "");
+                close(compile_err[0]);
 
                 if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                    throw std::runtime_error("Compilation failed");
+                    throw std::runtime_error(compile_error);
                 }
             }
             return binary_path;
         } else if (language == "java") {
             char* args[] = {
                 (char*)"javac",
+                (char*)"-d",
+                (char*)"/tmp",
                 (char*)source_path.c_str(),
                 NULL
             };
             const char* command = "javac";
+
+            int compile_err[2];
+            pipe(compile_err);
 
             pid_t c_pid = fork();
 
@@ -240,6 +254,10 @@ public:
             }
             //child process
             if (c_pid == 0) {
+                dup2(compile_err[1], STDERR_FILENO);
+                close(compile_err[0]);
+                close(compile_err[1]);
+
                 //replaces the current process with a new one
                 int status_code = execvp(command, args);
 
@@ -251,12 +269,14 @@ public:
                 //wait for child process result
                 pid_t result = waitpid(c_pid, &status, 0);
 
-                if (result == -1) {
-                    throw std::system_error(errno, std::generic_category(), "waitpid failed");
-                }
+                close(compile_err[1]);
+                char ebuf[4096];
+                ssize_t n = read(compile_err[0], ebuf, sizeof(ebuf));
+                std::string compile_error(n > 0 ? std::string(ebuf, n) : "");
+                close(compile_err[0]);
 
                 if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                    throw std::runtime_error("Compilation failed");
+                    throw std::runtime_error(compile_error);
                 }
             }
             return "/tmp";
