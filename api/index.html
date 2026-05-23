@@ -215,15 +215,26 @@
             scrollBeyondLastLine: false,
             lineNumbers:     "on",
             renderLineHighlight: "line",
-            padding:         { top: 16 }
+            padding:         { top: 16 },
+            quickSuggestions: true,
+            suggestOnTriggerCharacters: true,
+            tabCompletion: "on",
+            wordBasedSuggestions: true,
         });
     });
+
+    const templates = {
+        python: '# Python\nprint("hello from python")',
+        cpp: '#include <iostream>\n\nint main() {\n    std::cout << "hello from c++" << std::endl;\n    return 0;\n}',
+        java: 'public class NEXEC_CLASS {\n    public static void main(String[] args) {\n        System.out.println("hello from java!");\n    }\n}'
+    };
 
     // Sync Monaco language when dropdown changes
     document.getElementById("language-select").addEventListener("change", function () {
         const map = { cpp: "cpp", python: "python", java: "java" };
         if (editor) {
             monaco.editor.setModelLanguage(editor.getModel(), map[this.value]);
+            editor.setValue(templates[this.value]);
         }
     });
 
@@ -234,6 +245,9 @@
         const button = document.getElementById("run-btn");
         button.textContent = "Running...";
         button.disabled = true;
+
+        const output = document.getElementById("output-text");
+        const status = document.getElementById("status-badge");
 
         try {
             output.textContent = "";
@@ -246,18 +260,42 @@
                 body: JSON.stringify({source_code: code, language: language})
             });
             const data = await response.json();
-
-            const output = document.getElementById("output-text");
-            const status = document.getElementById("status-badge");
+            console.log("exit_code:", data.exit_code);
+            console.log("error:", data.error);
 
             status.textContent = data.exit_code === 0 ? "Done" : "Error";
             status.className = data.exit_code === 0 ? "success" : "error";
 
-            output.textContent = data.error ? data.error : data.output;
+            if (data.exit_code === 0) {
+                monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
+                output.textContent = data.output;
+            } else {
+                setErrorMarkers(data.error);
+                output.textContent = data.error;
+            }
         } finally {
             button.textContent = "▶ Run";
             button.disabled = false;
         }
+    }
+    function setErrorMarkers(errorText) {
+        const model = editor.getModel();
+        const markers = [];
+        const lines = errorText.split('\n');
+        for (const line of lines) {
+            const match = line.match(/:(\d+):(\d+):\s*error:\s*(.*)/);
+            if (match) {
+                markers.push({
+                    startLineNumber: parseInt(match[1]),
+                    startColumn: parseInt(match[2]),
+                    endLineNumber: parseInt(match[1]),
+                    endColumn: model.getLineMaxColumn(parseInt(match[1])),
+                    message: match[3],
+                    severity: monaco.MarkerSeverity.Error
+                });
+            }
+        }
+        monaco.editor.setModelMarkers(model, 'nexec', markers);
     }
 </script>
 
