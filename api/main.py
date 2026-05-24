@@ -28,14 +28,16 @@ def submit(request: SubmitRequest):
     extensions = {"cpp": ".cpp", "python": ".py", "java": ".java"}
     temp_file = f"/tmp/nexec_{job_id}{extensions[request.language]}"
 
+    print(f"DEBUG source:\n{request.source_code}", flush=True)
+
     with open(temp_file, "w") as f:
         f.write(request.source_code)
 
-        result = subprocess.run(
-            ["/nexec/nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
-            capture_output=True,
-            text=True
-        )
+    result = subprocess.run(
+        ["/nexec/nexec", "--language", request.language, "--job-id", str(job_id), "--source", temp_file],
+        capture_output=True,
+        text=True
+    )
 
     data = json.loads(result.stdout)
     return data
