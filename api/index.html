@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>nexec</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -33,6 +33,8 @@
             overflow: hidden;
             font-size: 14px;
         }
+
+        /* ── Header ── */
         header {
             display: flex;
             align-items: center;
@@ -41,7 +43,6 @@
             height: 48px;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
-            gap: 12px;
         }
         .logo {
             font-family: 'JetBrains Mono', monospace;
@@ -49,9 +50,9 @@
             font-size: 15px;
             color: var(--accent);
             letter-spacing: 0.04em;
-            flex-shrink: 0;
         }
         .header-right { display: flex; align-items: center; gap: 8px; }
+
         select {
             background: var(--surface2);
             color: var(--text);
@@ -70,6 +71,7 @@
             transition: border-color 0.15s;
         }
         select:hover { border-color: var(--border2); }
+
         .btn {
             border: 1px solid var(--border);
             background: var(--surface2);
@@ -86,17 +88,32 @@
             gap: 6px;
         }
         .btn:hover { border-color: var(--border2); color: var(--text); }
-        .btn-context { color: var(--text3); }
-        .btn-context.active { color: var(--accent); border-color: var(--accent-dim); }
+
+        /* context button — always visible, not greyed */
+        #context-btn {
+            color: var(--text2);
+            border-color: var(--border2);
+            background: var(--surface2);
+        }
+        #context-btn:hover { color: var(--text); border-color: var(--accent-dim); }
+        #context-btn.active {
+            color: var(--accent);
+            border-color: var(--accent);
+            background: #1e1a3a;
+        }
+
         #run-btn {
             background: var(--accent);
             color: #fff;
             border-color: var(--accent);
-            font-weight: 500;
-            padding: 5px 16px;
+            font-weight: 600;
+            padding: 5px 18px;
+            font-size: 13px;
         }
         #run-btn:hover { background: #6b5ce7; border-color: #6b5ce7; color: #fff; }
         #run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── Context strip ── */
         #context-strip {
             border-bottom: 1px solid var(--border);
             background: var(--surface);
@@ -105,64 +122,107 @@
             transition: max-height 0.2s ease;
             flex-shrink: 0;
         }
-        #context-strip.open { max-height: 80px; }
+        #context-strip.open { max-height: 140px; }
         .context-inner {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
-            padding: 10px 20px;
+            padding: 12px 20px;
         }
         .context-label {
             font-size: 11px;
-            color: var(--text3);
+            color: var(--text2);
             font-family: 'JetBrains Mono', monospace;
             white-space: nowrap;
             letter-spacing: 0.04em;
+            padding-top: 7px;
         }
         #context-input {
             flex: 1;
             background: var(--surface2);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border2);
             color: var(--text);
-            padding: 6px 12px;
+            padding: 8px 12px;
             font-family: 'Inter', sans-serif;
             font-size: 13px;
             border-radius: 6px;
             outline: none;
             transition: border-color 0.15s;
+            resize: none;
+            min-height: 72px;
+            line-height: 1.5;
         }
         #context-input::placeholder { color: var(--text3); }
         #context-input:focus { border-color: var(--accent-dim); }
-        main { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-        #editor-container { flex: 1; min-height: 0; border-bottom: 1px solid var(--border); }
+
+        /* ── Main ── */
+        main {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        #editor-container { flex: 1; min-height: 0; }
+
+        /* ── Drag handle ── */
+        #drag-handle {
+            height: 5px;
+            background: var(--border);
+            cursor: ns-resize;
+            flex-shrink: 0;
+            transition: background 0.15s;
+            position: relative;
+        }
+        #drag-handle:hover { background: var(--accent-dim); }
+        #drag-handle::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 32px;
+            height: 2px;
+            border-radius: 2px;
+            background: var(--text3);
+        }
+
+        /* ── Bottom panel ── */
         #bottom-panel {
-            height: 240px;
             flex-shrink: 0;
             display: flex;
             flex-direction: column;
             background: var(--surface);
+            border-top: 1px solid var(--border);
+            min-height: 80px;
+            max-height: 80vh;
         }
-        .panel-tabs {
+
+        /* ── Panel header ── */
+        .panel-header {
             display: flex;
             align-items: center;
             border-bottom: 1px solid var(--border);
-            padding: 0 16px;
             flex-shrink: 0;
         }
-        .tab {
-            font-size: 12px;
-            font-weight: 500;
-            color: var(--text3);
-            padding: 8px 14px;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -1px;
-            transition: color 0.15s;
-            user-select: none;
+        .panel-col-header {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            height: 40px;
         }
-        .tab:hover { color: var(--text2); }
-        .tab.active { color: var(--text); border-bottom-color: var(--accent); }
-        .panel-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+        .panel-col-header + .panel-col-header {
+            border-left: 1px solid var(--border);
+        }
+        .panel-col-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--text);
+        }
+
         #status-badge {
             font-family: 'JetBrains Mono', monospace;
             font-size: 10px;
@@ -175,52 +235,64 @@
         #status-badge.running { border-color: var(--accent-dim); color: var(--accent); }
         #status-badge.success { border-color: #166534; color: var(--success); }
         #status-badge.error   { border-color: #7f1d1d; color: var(--error); }
+
+        /* explain button — prominent, always noticeable */
         #explain-btn {
             display: none;
-            font-size: 11px;
-            padding: 3px 10px;
-            background: var(--hint-bg);
-            border: 1px solid var(--hint-border);
-            color: #a78bfa;
-            border-radius: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            background: var(--accent);
+            border: none;
+            color: #fff;
+            border-radius: 6px;
             cursor: pointer;
             font-family: 'Inter', sans-serif;
-            font-weight: 500;
-            transition: all 0.15s;
+            transition: background 0.15s, opacity 0.15s;
+            letter-spacing: 0.02em;
         }
-        #explain-btn:hover { background: #23233a; }
-        .panel-body {
+        #explain-btn:hover { background: #6b5ce7; }
+        #explain-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── Two column body ── */
+        .panel-columns {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .panel-col {
             flex: 1;
             overflow-y: auto;
             padding: 12px 16px;
+            min-width: 0;
+        }
+        .panel-col + .panel-col { border-left: 1px solid var(--border); }
+
+        #output-body {
             font-family: 'JetBrains Mono', monospace;
             font-size: 12.5px;
             line-height: 1.65;
             white-space: pre-wrap;
             word-break: break-all;
-            display: none;
+            color: var(--text2);
         }
-        .panel-body.active { display: block; }
-        #output-body { color: var(--text2); }
         #output-body.has-error { color: var(--error); }
+
         #hints-body {
-            display: none;
+            display: flex;
             flex-direction: column;
             gap: 12px;
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px 16px;
             font-family: 'Inter', sans-serif;
             font-size: 13px;
             line-height: 1.6;
         }
-        #hints-body.active { display: flex; }
         .hint-empty {
             color: var(--text3);
-            font-size: 11px;
-            font-family: 'JetBrains Mono', monospace;
-            align-self: center;
-            margin-top: 20px;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+            text-align: center;
+            margin-top: 16px;
         }
         .hint-msg {
             background: var(--hint-bg);
@@ -239,7 +311,11 @@
             margin-bottom: 6px;
             display: block;
         }
-        .hint-msg.thinking { color: var(--text3); font-style: italic; border-style: dashed; }
+        .hint-msg.thinking {
+            color: var(--text3);
+            font-style: italic;
+            border-style: dashed;
+        }
         .hint-run-marker {
             font-size: 10px;
             font-family: 'JetBrains Mono', monospace;
@@ -256,7 +332,7 @@
 <header>
     <span class="logo">nexec</span>
     <div class="header-right">
-        <button class="btn btn-context" id="context-btn" onclick="toggleContext()">
+        <button class="btn" id="context-btn" onclick="toggleContext()">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/>
                 <line x1="6" y1="5" x2="6" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
@@ -276,25 +352,34 @@
 <div id="context-strip">
     <div class="context-inner">
         <span class="context-label">goal //</span>
-        <input id="context-input" type="text"
-               placeholder="What is your code supposed to do? e.g. 'print all primes up to n'" />
+        <textarea id="context-input"
+                  placeholder="Describe what your code is supposed to do, e.g. 'Insert a node into a max heap' or 'Reverse a doubly linked list in-place'"></textarea>
     </div>
 </div>
 
 <main>
     <div id="editor-container"></div>
-    <div id="bottom-panel">
-        <div class="panel-tabs">
-            <div class="tab active" id="tab-output" onclick="switchTab('output')">output</div>
-            <div class="tab" id="tab-hints" onclick="switchTab('hints')">hints</div>
-            <div class="panel-right">
-                <button id="explain-btn" onclick="handleExplain()">✦ explain</button>
+    <div id="drag-handle"></div>
+    <div id="bottom-panel" style="height: 280px;">
+        <div class="panel-header">
+            <div class="panel-col-header">
+                <span class="panel-col-label">Output</span>
                 <span id="status-badge">idle</span>
             </div>
+            <div class="panel-col-header">
+                <span class="panel-col-label">Hints</span>
+                <button id="explain-btn" onclick="handleExplain()">✦ Explain</button>
+            </div>
         </div>
-        <div id="output-body" class="panel-body active">ready.</div>
-        <div id="hints-body">
-            <span class="hint-empty">run your code and click explain to get a hint</span>
+        <div class="panel-columns">
+            <div class="panel-col">
+                <div id="output-body">ready.</div>
+            </div>
+            <div class="panel-col">
+                <div id="hints-body">
+                    <span class="hint-empty">Run your code and click Explain to get a hint.</span>
+                </div>
+            </div>
         </div>
     </div>
 </main>
@@ -322,12 +407,12 @@
             inherit: true,
             rules: [{ token: "comment", foreground: "4a4a5a", fontStyle: "italic" }],
             colors: {
-                "editor.background":              "#111113",
-                "editor.lineHighlightBackground": "#18181b",
-                "editorLineNumber.foreground":    "#2e2e34",
+                "editor.background":                 "#111113",
+                "editor.lineHighlightBackground":    "#18181b",
+                "editorLineNumber.foreground":       "#2e2e34",
                 "editorLineNumber.activeForeground": "#52525b",
-                "editor.selectionBackground":     "#2d2b55",
-                "editorCursor.foreground":        "#7c6af7",
+                "editor.selectionBackground":        "#2d2b55",
+                "editorCursor.foreground":           "#7c6af7",
             }
         });
 
@@ -373,13 +458,37 @@
         if (isOpen) setTimeout(() => document.getElementById("context-input").focus(), 220);
     }
 
-    function switchTab(tab) {
-        document.getElementById("tab-output").classList.toggle("active", tab === "output");
-        document.getElementById("tab-hints").classList.toggle("active", tab === "hints");
-        document.getElementById("output-body").classList.toggle("active", tab === "output");
-        document.getElementById("hints-body").classList.toggle("active", tab === "hints");
-    }
+    /* ── Drag to resize ── */
+    const dragHandle = document.getElementById("drag-handle");
+    const bottomPanel = document.getElementById("bottom-panel");
+    let isDragging = false;
+    let dragStartY = 0;
+    let dragStartHeight = 0;
 
+    dragHandle.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        dragStartY = e.clientY;
+        dragStartHeight = bottomPanel.offsetHeight;
+        document.body.style.cursor = "ns-resize";
+        document.body.style.userSelect = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const delta = dragStartY - e.clientY;
+        const newHeight = Math.min(Math.max(dragStartHeight + delta, 80), window.innerHeight * 0.8);
+        bottomPanel.style.height = newHeight + "px";
+        if (editor) editor.layout();
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (!isDragging) return;
+        isDragging = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+    });
+
+    /* ── Error markers ── */
     function setErrorMarkers(errorText) {
         const model = editor.getModel();
         const markers = [];
@@ -402,6 +511,7 @@
         monaco.editor.setModelMarkers(model, 'nexec', markers);
     }
 
+    /* ── Run ── */
     async function handleRun() {
         const code = editor.getValue();
         const language = document.getElementById("language-select").value;
@@ -414,10 +524,9 @@
         runBtn.disabled = true;
         explainBtn.style.display = "none";
         outputBody.textContent = "";
-        outputBody.className = "panel-body active";
+        outputBody.className = "";
         statusBadge.textContent = "running";
         statusBadge.className = "running";
-        switchTab("output");
 
         try {
             const response = await fetch("/submit", {
@@ -433,15 +542,16 @@
                 statusBadge.textContent = "done";
                 statusBadge.className = "success";
                 outputBody.textContent = data.output || "(no output)";
-                outputBody.className = "panel-body active";
+                outputBody.className = "";
                 monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
             } else {
                 statusBadge.textContent = "error";
                 statusBadge.className = "error";
                 outputBody.textContent = data.error || "unknown error";
-                outputBody.className = "panel-body active has-error";
+                outputBody.className = "has-error";
                 setErrorMarkers(data.error || "");
             }
+
             explainBtn.style.display = "block";
 
             if (runCount > 1) {
@@ -456,9 +566,64 @@
         }
     }
 
+    /* ── Explain ── */
     async function handleExplain() {
-        // AI integration — next step
-        console.log("explain clicked — AI integration coming next");
+        if (!lastRunData) return;
+        const explainBtn = document.getElementById("explain-btn");
+        const hintsBody = document.getElementById("hints-body");
+
+        const emptyMsg = hintsBody.querySelector(".hint-empty");
+        if (emptyMsg) emptyMsg.remove();
+
+        const thinking = document.createElement("div");
+        thinking.className = "hint-msg thinking";
+        thinking.textContent = "thinking...";
+        hintsBody.appendChild(thinking);
+        hintsBody.scrollTop = hintsBody.scrollHeight;
+
+        explainBtn.disabled = true;
+
+        try {
+            const response = await fetch("/explain", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    language: lastRunData.language,
+                    source_code: lastRunData.code,
+                    output: lastRunData.data.output || "",
+                    error: lastRunData.data.error || "",
+                    exit_code: lastRunData.data.exit_code,
+                    context: document.getElementById("context-input").value,
+                    message_history: hintHistory
+                })
+            });
+            const data = await response.json();
+            thinking.remove();
+
+            const hintEl = document.createElement("div");
+            hintEl.className = "hint-msg";
+            hintEl.innerHTML = `<span class="hint-label">hint</span>${escapeHtml(data.hint)}`;
+            hintsBody.appendChild(hintEl);
+            hintsBody.scrollTop = hintsBody.scrollHeight;
+
+            const userMsg = `Language: ${lastRunData.language}\nCode:\n${lastRunData.code}\nOutput: ${lastRunData.data.output || ""}\nError: ${lastRunData.data.error || ""}\nGoal: ${document.getElementById("context-input").value}`;
+            hintHistory.push({ role: "user", content: userMsg });
+            hintHistory.push({ role: "assistant", content: data.hint });
+
+        } catch (err) {
+            thinking.remove();
+            const errEl = document.createElement("div");
+            errEl.className = "hint-msg";
+            errEl.style.color = "var(--error)";
+            errEl.textContent = "failed to get hint — check your API key";
+            hintsBody.appendChild(errEl);
+        } finally {
+            explainBtn.disabled = false;
+        }
+    }
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
     }
 </script>
 </body>
