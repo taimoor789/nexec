@@ -6,9 +6,10 @@ import subprocess
 import json
 import threading
 from typing import List
-import requests
+import anthropic
 
 app = FastAPI()
+client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
 job_counter = 0
 counter_lock = threading.Lock()
@@ -83,6 +84,17 @@ def explain(request: ExplainRequest):
 
     messages = [{"role": m.role, "content": m.content} for m in request.message_history]
     messages.append({"role": "user", "content": user_message})
+
+    response = client.messages.create(
+        model = "claude-sonnet-4-6",
+        max_tokens=1024,
+        system=system_prompt,
+        messages=messages
+    )
+
+    hint = response.content[0].text
+    return {"hint": hint}
+
 
 
 
