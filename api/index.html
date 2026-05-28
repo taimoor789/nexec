@@ -8,20 +8,20 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --bg:         #111113;
-            --surface:    #18181b;
-            --surface2:   #1f1f23;
-            --border:     #2e2e34;
-            --border2:    #3a3a42;
-            --accent:     #7c6af7;
-            --accent-dim: #4a3fa8;
+            --bg:         #0f0f0f;
+            --surface:    #161616;
+            --surface2:   #1e1e1e;
+            --border:     #2a1f1f;
+            --border2:    #3d2020;
+            --accent:     #CC0000;
+            --accent-dim: #8B0000;
             --text:       #e4e4e7;
             --text2:      #a1a1aa;
             --text3:      #52525b;
             --success:    #4ade80;
             --error:      #f87171;
-            --hint-bg:    #1c1c2e;
-            --hint-border:#3b3a6e;
+            --hint-bg:    #1e1010;
+            --hint-border:#5a1a1a;
         }
         body {
             background: var(--bg);
@@ -48,7 +48,7 @@
             font-family: 'JetBrains Mono', monospace;
             font-weight: 500;
             font-size: 15px;
-            color: var(--accent);
+            color: #F5C800;
             letter-spacing: 0.04em;
         }
         .header-right { display: flex; align-items: center; gap: 8px; }
@@ -97,9 +97,9 @@
         }
         #context-btn:hover { color: var(--text); border-color: var(--accent-dim); }
         #context-btn.active {
-            color: var(--accent);
-            border-color: var(--accent);
-            background: #1e1a3a;
+            color: #F5C800;
+            border-color: #8B0000;
+            background: #1e1010;
         }
 
         #run-btn {
@@ -110,7 +110,7 @@
             padding: 5px 18px;
             font-size: 13px;
         }
-        #run-btn:hover { background: #6b5ce7; border-color: #6b5ce7; color: #fff; }
+        #run-btn:hover { background: #aa0000; border-color: #aa0000; color: #fff; }
         #run-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
         /* ── Context strip ── */
@@ -251,7 +251,7 @@
             transition: background 0.15s, opacity 0.15s;
             letter-spacing: 0.02em;
         }
-        #explain-btn:hover { background: #6b5ce7; }
+        #explain-btn:hover { background: #aa0000; }
         #explain-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         /* ── Two column body ── */
@@ -299,14 +299,14 @@
             border: 1px solid var(--hint-border);
             border-radius: 8px;
             padding: 10px 14px;
-            color: #c4b5fd;
+            color: #e8c5c5;
             font-size: 13px;
             line-height: 1.65;
         }
         .hint-msg .hint-label {
             font-size: 10px;
             font-family: 'JetBrains Mono', monospace;
-            color: var(--accent);
+            color: #F5C800;
             letter-spacing: 0.06em;
             margin-bottom: 6px;
             display: block;
@@ -407,12 +407,12 @@
             inherit: true,
             rules: [{ token: "comment", foreground: "4a4a5a", fontStyle: "italic" }],
             colors: {
-                "editor.background":                 "#111113",
-                "editor.lineHighlightBackground":    "#18181b",
+                "editor.background":                 "#0f0f0f",
+                "editor.lineHighlightBackground":    "#1a1010",
                 "editorLineNumber.foreground":       "#2e2e34",
                 "editorLineNumber.activeForeground": "#52525b",
-                "editor.selectionBackground":        "#2d2b55",
-                "editorCursor.foreground":           "#7c6af7",
+                "editor.selectionBackground":        "#3d1010",
+                "editorCursor.foreground":           "#CC0000",
             }
         });
 
@@ -422,7 +422,7 @@
             theme: "nexec-dark",
             fontSize: 13.5,
             fontFamily: "'JetBrains Mono', monospace",
-            fontLigatures: true,
+            fontLigatures: false,
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             lineNumbers: "on",
