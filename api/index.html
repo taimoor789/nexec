@@ -401,6 +401,14 @@
         java: 'public class NEXEC_CLASS {\n    public static void main(String[] args) {\n        System.out.println("hello from java!");\n    }\n}'
     };
 
+    // persists each language's code across switches
+    const languageState = {
+        python: templates.python,
+        cpp: templates.cpp,
+        java: templates.java
+    };
+    let currentLanguage = "python";
+
     require(["vs/editor/editor.main"], function () {
         monaco.editor.defineTheme("nexec-dark", {
             base: "vs-dark",
@@ -417,7 +425,7 @@
         });
 
         editor = monaco.editor.create(document.getElementById("editor-container"), {
-            value: templates.python,
+            value: languageState.python,
             language: "python",
             theme: "nexec-dark",
             fontSize: 13.5,
@@ -439,14 +447,17 @@
 
         editor.onDidChangeModelContent(() => {
             monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
+            languageState[currentLanguage] = editor.getValue();
         });
     });
 
     document.getElementById("language-select").addEventListener("change", function () {
         const map = { cpp: "cpp", python: "python", java: "java" };
         if (editor) {
+            languageState[currentLanguage] = editor.getValue();
+            currentLanguage = this.value;
             monaco.editor.setModelLanguage(editor.getModel(), map[this.value]);
-            editor.setValue(templates[this.value]);
+            editor.setValue(languageState[this.value]);
             monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
         }
         // clear output
