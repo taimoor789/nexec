@@ -64,15 +64,14 @@ int main(int argc, char* argv[]) {
         std::string output = escape(result.output);
         std::string error = escape(result.error);
 
-        std::cout << "{\"output\": \"" << output <<
-            "\", \"error\": \"" << error <<
-                "\", \"exit_code\": " << result.exit_code << "}"
-        << std::endl;
+        std::cout << "{\"output\": \"" << output << "\", \"error\": \"" << error
+          << "\", \"exit_code\": " << result.exit_code
+          << ", \"duration_ms\": " << result.duration_ms << "}";
 
     } catch (const std::exception& e) {
         std::cout << "{\"output\": \"" << "" <<
             "\", \"error\": \"" << escape(e.what()) <<
-                "\", \"exit_code\": " << -1 << "}"
+            ", \"duration_ms\": " << 0 << "}"
         << std::endl;
         return 1;
     }
