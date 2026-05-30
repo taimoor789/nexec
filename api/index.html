@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>nexec</title>
+    <title>NEXEC</title>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -330,7 +330,7 @@
 <body>
 
 <header>
-    <span class="logo">nexec</span>
+    <span class="logo">NEXEC</span>
     <div class="header-right">
         <button class="btn" id="context-btn" onclick="toggleContext()">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -338,14 +338,14 @@
                 <line x1="6" y1="5" x2="6" y2="8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                 <circle cx="6" cy="3.5" r="0.7" fill="currentColor"/>
             </svg>
-            context
+            Context
         </button>
         <select id="language-select">
-            <option value="python">python</option>
-            <option value="cpp">c++</option>
-            <option value="java">java</option>
+            <option value="python">Python</option>
+            <option value="cpp">C++</option>
+            <option value="java">Java</option>
         </select>
-        <button class="btn" id="run-btn" onclick="handleRun()">▶ run</button>
+        <button class="btn" id="run-btn" onclick="handleRun()">▶ Run</button>
     </div>
 </header>
 
@@ -364,7 +364,7 @@
         <div class="panel-header">
             <div class="panel-col-header">
                 <span class="panel-col-label">Output</span>
-                <span id="status-badge">idle</span>
+                <span id="status-badge">Idle</span>
             </div>
             <div class="panel-col-header">
                 <span class="panel-col-label">Hints</span>
@@ -373,7 +373,7 @@
         </div>
         <div class="panel-columns">
             <div class="panel-col">
-                <div id="output-body">ready.</div>
+                <div id="output-body"></div>
             </div>
             <div class="panel-col">
                 <div id="hints-body">
@@ -447,7 +447,24 @@
         if (editor) {
             monaco.editor.setModelLanguage(editor.getModel(), map[this.value]);
             editor.setValue(templates[this.value]);
+            monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
         }
+        // clear output
+        const outputBody = document.getElementById("output-body");
+        outputBody.textContent = "";
+        outputBody.className = "";
+        // clear hints
+        const hintsBody = document.getElementById("hints-body");
+        hintsBody.innerHTML = '<span class="hint-empty">Run your code and click Explain to get a hint.</span>';
+        hintHistory = [];
+        lastRunData = null;
+        runCount = 0;
+        // reset status
+        const statusBadge = document.getElementById("status-badge");
+        statusBadge.textContent = "Idle";
+        statusBadge.className = "";
+        // hide explain button
+        document.getElementById("explain-btn").style.display = "none";
     });
 
     function toggleContext() {
@@ -561,7 +578,7 @@
                 document.getElementById("hints-body").appendChild(marker);
             }
         } finally {
-            runBtn.textContent = "▶ run";
+            runBtn.textContent = "▶ Run";
             runBtn.disabled = false;
         }
     }
@@ -577,7 +594,7 @@
 
         const thinking = document.createElement("div");
         thinking.className = "hint-msg thinking";
-        thinking.textContent = "thinking...";
+        thinking.textContent = "Thinking...";
         hintsBody.appendChild(thinking);
         hintsBody.scrollTop = hintsBody.scrollHeight;
 
@@ -602,7 +619,7 @@
 
             const hintEl = document.createElement("div");
             hintEl.className = "hint-msg";
-            hintEl.innerHTML = `<span class="hint-label">hint</span>${escapeHtml(data.hint)}`;
+            hintEl.innerHTML = `<span class="hint-label">Hint</span>${escapeHtml(data.hint)}`;
             hintsBody.appendChild(hintEl);
             hintsBody.scrollTop = hintsBody.scrollHeight;
 
