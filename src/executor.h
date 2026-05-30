@@ -17,6 +17,7 @@ struct RunResult {
     std::string output;
     std::string error;
     int exit_code;
+    long long duration_ms;
 };
 
 struct ChildArgs {
@@ -320,17 +321,20 @@ public:
             close(errpipe[1]);
 
             int status;
+            long long ms;
             auto start = std::chrono::steady_clock::now();
+
             while (true) {
                 //suspend parent until child changes state
                 pid_t result = waitpid(pid, &status, WNOHANG);
                 if (result != 0) break; //child exited
                 auto elapsed = std::chrono::steady_clock::now() - start;
+                ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
                 if (elapsed >= std::chrono::seconds(5)) {
                     kill(pid, SIGKILL);
                     waitpid(pid, &status, 0);
                     delete[] stack;
-                    return RunResult{"", "Timeout: execution exceeded 5 seconds", -1};
+                    return RunResult{"", "Timeout: execution exceeded 5 seconds", -1, ms};
                 }
                 usleep(10000);
             }
@@ -338,7 +342,7 @@ public:
             if (check_oom(job_id)) {
                 cleanup_cgroup(job_id);
                 delete[] stack;
-                return RunResult{"", "Memory Limit Exceeded", -1};
+                return RunResult{"", "Memory Limit Exceeded", -1, ms};
             }
 
             if (WIFSIGNALED(status)) {
@@ -346,11 +350,11 @@ public:
                 if (sig == SIGSEGV) {
                     cleanup_cgroup(job_id);
                     delete[] stack;
-                    return RunResult{"", "Memory limit exceeded", -1};
+                    return RunResult{"", "Memory limit exceeded", -1, ms};
                 }
                 cleanup_cgroup(job_id);
                 delete[] stack;
-                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
+                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1, ms};
             }
 
             std::string out_str, err_str;
@@ -363,15 +367,15 @@ public:
 
             if (WIFSIGNALED(status)) {
                 int sig = WTERMSIG(status);
-                if (sig == SIGSEGV) return RunResult{"", "Memory limit exceeded", -1};
-                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1};
+                if (sig == SIGSEGV) return RunResult{"", "Memory limit exceeded", -1, ms};
+                return RunResult{"", "Process killed by signal: " + std::to_string(sig), -1, ms};
             }
 
             if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                return RunResult{"", err_str, WEXITSTATUS(status)};
+                return RunResult{"", err_str, WEXITSTATUS(status), ms};
             }
 
-            return RunResult{out_str, err_str, WEXITSTATUS(status)};
+            return RunResult{out_str, err_str, WEXITSTATUS(status), ms};
         }
     }
 };
