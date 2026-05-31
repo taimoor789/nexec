@@ -365,6 +365,12 @@
             <div class="panel-col-header">
                 <span class="panel-col-label">Output</span>
                 <span id="status-badge">Idle</span>
+                <span id="exec-time" style="
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 10px;
+                    color: var(--text3);
+                    letter-spacing: 0.04em;
+                "></span>
             </div>
             <div class="panel-col-header">
                 <span class="panel-col-label">Hints</span>
@@ -565,6 +571,7 @@
             const data = await response.json();
             lastRunData = { code, language, data };
             runCount++;
+            document.getElementById("exec-time").textContent = `${data.duration_ms}ms`;
 
             if (data.exit_code === 0) {
                 statusBadge.textContent = "done";
@@ -579,7 +586,6 @@
                 outputBody.className = "has-error";
                 setErrorMarkers(data.error || "");
             }
-
             explainBtn.style.display = "block";
 
             if (runCount > 1) {
