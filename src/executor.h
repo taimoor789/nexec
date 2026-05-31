@@ -26,6 +26,7 @@ struct ChildArgs {
     int job_id;
     int outpipe[2];
     int errpipe[2];
+    int stdinpipe[2];
 };
 
 int child_fn(void* arg) {
@@ -33,6 +34,10 @@ int child_fn(void* arg) {
 
     close(args->outpipe[0]);
     close(args->errpipe[0]);
+
+    close(args->stdinpipe[1]);  // close write end - child doesn't write
+    dup2(args->stdinpipe[0], STDIN_FILENO);  // replace stdin with pipe read end
+    close(args->stdinpipe[0]);
 
     //stdout to outpipe's write end
     dup2(args->outpipe[1], STDOUT_FILENO);
@@ -285,13 +290,14 @@ public:
         throw std::runtime_error("Unsupported language: " + language);
     }
 
-    RunResult run(const std::string& binary_path, int job_id, const std::string& language) {
+    RunResult run(const std::string& binary_path, int job_id, const std::string& language, const std::string& stdin_input) {
         const int STACK_SIZE = 1024 * 1024;
         char* stack = new char[STACK_SIZE];
 
         int outpipe[2];
         int errpipe[2];
-        if (pipe(outpipe) == -1 || pipe(errpipe) == -1) {
+        int stdinpipe[2];
+        if (pipe(outpipe) == -1 || pipe(errpipe) == -1 || pipe(stdinpipe) == -1) {
             perror("pipe() failed");
         }
 
@@ -303,6 +309,8 @@ public:
         args.outpipe[1] = outpipe[1];
         args.errpipe[0] = errpipe[0];
         args.errpipe[1] = errpipe[1];
+        args.stdinpipe[0] = stdinpipe[0];
+        args.stdinpipe[1] = stdinpipe[1];
 
         create_cgroup(job_id);
 
@@ -319,6 +327,13 @@ public:
 
             close(outpipe[1]);
             close(errpipe[1]);
+
+            // write stdin input to child then close so child gets EOF
+            if (!stdin_input.empty()) {
+                write(stdinpipe[1], stdin_input.c_str(), stdin_input.size());
+            }
+            close(stdinpipe[1]);  // always close - sends EOF to child
+            close(stdinpipe[0]);  // parent doesn't read from stdin pipe
 
             int status;
             long long ms;
