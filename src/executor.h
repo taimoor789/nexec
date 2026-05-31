@@ -35,10 +35,6 @@ int child_fn(void* arg) {
     close(args->outpipe[0]);
     close(args->errpipe[0]);
 
-    close(args->stdinpipe[1]);  // close write end - child doesn't write
-    dup2(args->stdinpipe[0], STDIN_FILENO);  // replace stdin with pipe read end
-    close(args->stdinpipe[0]);
-
     //stdout to outpipe's write end
     dup2(args->outpipe[1], STDOUT_FILENO);
     //stderr to errpipe's write end
@@ -46,6 +42,10 @@ int child_fn(void* arg) {
 
     close(args->outpipe[1]);
     close(args->errpipe[1]);
+
+    close(args->stdinpipe[1]);  // close write end - child doesn't write
+    dup2(args->stdinpipe[0], STDIN_FILENO);  // replace stdin with pipe read end
+    close(args->stdinpipe[0]);
 
     if (args->language != "java") {
         //Add a filter context SCMP_ACT_ALLOW means allow everything by default
