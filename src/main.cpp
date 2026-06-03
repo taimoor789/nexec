@@ -18,6 +18,7 @@ int main(int argc, char* argv[]) {
     std::string language;
     std::string id;
     std::string source;
+    std::string stdin_input;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -34,6 +35,17 @@ int main(int argc, char* argv[]) {
 
         if (arg == "--job-id" && i + 1 < argc) {
             id = argv[i + 1];
+            i++;
+        }
+
+        if (arg == "--stdin" && i + 1 < argc) {
+            std::ifstream sifs(argv[i + 1]);
+            if (sifs.is_open()) {
+                std::string sline;
+                while (std::getline(sifs, sline)) {
+                    stdin_input += sline + "\n";
+                }
+            }
             i++;
         }
     }
@@ -59,7 +71,7 @@ int main(int argc, char* argv[]) {
     try {
         std::string source_path = executor.write_source(job);
         std::string binary_path = executor.compile(source_path, job_id, language);
-        RunResult result = executor.run(binary_path, job_id, language);
+        RunResult result = executor.run(binary_path, job_id, language, stdin_input);
 
         std::string output = escape(result.output);
         std::string error = escape(result.error);
