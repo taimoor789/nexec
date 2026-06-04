@@ -205,6 +205,14 @@ async def run_ws(websocket: WebSocket):
             proc.kill()
         except Exception:
             pass
+@app.get("/xterm.js")
+def xterm_js(): return FileResponse("xterm.js")
+
+@app.get("/xterm.css")
+def xterm_css(): return FileResponse("xterm.css")
+
+@app.get("/xterm-addon-fit.js")
+def xterm_fit(): return FileResponse("xterm-addon-fit.js")
 
 @app.post("/explain")
 def explain(request: ExplainRequest):
