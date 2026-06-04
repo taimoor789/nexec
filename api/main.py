@@ -214,6 +214,9 @@ def xterm_css(): return FileResponse("xterm.css")
 @app.get("/xterm-addon-fit.js")
 def xterm_fit(): return FileResponse("xterm-addon-fit.js")
 
+@app.get("/favicon.ico")
+def favicon(): return FileResponse("favicon.svg")
+
 @app.post("/explain")
 def explain(request: ExplainRequest):
     system_prompt = """You are a CS teaching assistant helping university students debug and understand their code.
