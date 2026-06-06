@@ -61,7 +61,7 @@
         select {
             background: var(--surface2);
             color: var(--text);
-            border: 1px solid var(--border);
+            border: 1px solid var(--border2);
             padding: 5px 10px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 12px;
@@ -69,13 +69,21 @@
             outline: none;
             appearance: none;
             padding-right: 24px;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%2352525b'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23F5C800'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 8px center;
             border-radius: 6px;
-            transition: border-color 0.15s;
+            transition: border-color 0.15s, background 0.15s;
+            font-weight: 500;
         }
-        select:hover { border-color: var(--border2); }
+        select:hover {
+            border-color: var(--accent);
+            background-color: #1e1010;
+        }
+        select:focus {
+            border-color: var(--accent);
+            background-color: #1e1010;
+        }
 
         .btn {
             border: 1px solid var(--border);
@@ -370,7 +378,7 @@
 
 <div id="context-strip">
     <div class="context-inner">
-        <span class="context-label">goal //</span>
+        <span class="context-label">Goal: </span>
         <textarea id="context-input"
                   placeholder="Describe what your code is supposed to do, e.g. 'Insert a node into a max heap' or 'Reverse a doubly linked list in-place'"></textarea>
     </div>
@@ -459,9 +467,9 @@
     };
 
     const languageState = {
-        python: templates.python,
-        cpp: templates.cpp,
-        java: templates.java
+        python: localStorage.getItem("nexec_code_python") || templates.python,
+        cpp:    localStorage.getItem("nexec_code_cpp")    || templates.cpp,
+        java:   localStorage.getItem("nexec_code_java")   || templates.java
     };
 
     require.config({
@@ -507,6 +515,7 @@
         editor.onDidChangeModelContent(() => {
             monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
             languageState[currentLanguage] = editor.getValue();
+            localStorage.setItem(`nexec_code_${currentLanguage}`, editor.getValue());
         });
     });
 
