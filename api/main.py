@@ -171,6 +171,9 @@ async def run_ws(websocket: WebSocket):
                     elif msg.get("type") == "resize":
                         ws = struct.pack("HHHH", msg["rows"], msg["cols"], 0, 0)
                         fcntl.ioctl(master_fd, termios.TIOCSWINSZ, ws)
+                    elif msg.get("type") == "kill":
+                        proc.kill()
+                        break
             except (WebSocketDisconnect, Exception):
                 pass
 

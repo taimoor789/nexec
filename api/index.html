@@ -4,7 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>NEXEC</title>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="icon" .../>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono..."/>
+    <link rel="stylesheet" href="/xterm.css"/>
+    <script src="/xterm.js"></script>
+    <script src="/xterm-addon-fit.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
@@ -89,7 +94,6 @@
         }
         .btn:hover { border-color: var(--border2); color: var(--text); }
 
-        /* context button — always visible, not greyed */
         #context-btn {
             color: var(--text2);
             border-color: var(--border2);
@@ -197,7 +201,6 @@
             max-height: 80vh;
         }
 
-        /* ── Panel header ── */
         .panel-header {
             display: flex;
             align-items: center;
@@ -211,22 +214,25 @@
             justify-content: space-between;
             padding: 0 16px;
             height: 40px;
+            min-width: 0;
+            overflow: hidden;
         }
-        .panel-col-header + .panel-col-header {
-            border-left: 1px solid var(--border);
-        }
+        .panel-col-header + .panel-col-header { border-left: 1px solid var(--border); }
         .panel-col-label {
             font-family: 'Inter', sans-serif;
-            font-size: 13px;
+            font-size: 15px;
             font-weight: 600;
             letter-spacing: 0.02em;
             color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         #status-badge {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            padding: 2px 8px;
+            font-size: 12px;
+            padding: 3px 10px;
             border-radius: 4px;
             border: 1px solid var(--border);
             color: var(--text3);
@@ -236,7 +242,13 @@
         #status-badge.success { border-color: #166534; color: var(--success); }
         #status-badge.error   { border-color: #7f1d1d; color: var(--error); }
 
-        /* explain button — prominent, always noticeable */
+        #exec-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text2);
+            letter-spacing: 0.04em;
+        }
+
         #explain-btn {
             display: none;
             font-size: 12px;
@@ -261,24 +273,31 @@
             overflow: hidden;
             min-height: 0;
         }
-        .panel-col {
+
+        /* terminal column */
+        #terminal-col {
             flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            padding: 8px;
+            background: #0f0f0f;
+        }
+        #terminal-container {
+            width: 100%;
+            height: 100%;
+        }
+        /* make xterm fill its container */
+        #terminal-container .xterm { height: 100%; }
+        #terminal-container .xterm-viewport { overflow-y: auto !important; }
+
+        /* hints column */
+        #hints-col {
+            flex: 1;
+            min-width: 0;
+            border-left: 1px solid var(--border);
             overflow-y: auto;
             padding: 12px 16px;
-            min-width: 0;
         }
-        .panel-col + .panel-col { border-left: 1px solid var(--border); }
-
-        #output-body {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12.5px;
-            line-height: 1.65;
-            white-space: pre-wrap;
-            word-break: break-all;
-            color: var(--text2);
-        }
-        #output-body.has-error { color: var(--error); }
-
         #hints-body {
             display: flex;
             flex-direction: column;
@@ -363,14 +382,14 @@
     <div id="bottom-panel" style="height: 280px;">
         <div class="panel-header">
             <div class="panel-col-header">
-                <span class="panel-col-label">Output</span>
-                <span id="status-badge">Idle</span>
-                <span id="exec-time" style="
-                    font-family: 'JetBrains Mono', monospace;
-                    font-size: 10px;
-                    color: var(--text3);
-                    letter-spacing: 0.04em;
-                "></span>
+                <span class="panel-col-label">Terminal</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <button id="stop-btn" onclick="handleStop()" style="display:none; font-size:11px; padding:3px 10px; background:#7f1d1d; border:1px solid #991b1b; color:#f87171; border-radius:5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;">
+                         Stop
+                    </button>
+                    <span id="exec-time"></span>
+                    <span id="status-badge">Idle</span>
+                </div>
             </div>
             <div class="panel-col-header">
                 <span class="panel-col-label">Hints</span>
@@ -378,10 +397,10 @@
             </div>
         </div>
         <div class="panel-columns">
-            <div class="panel-col">
-                <div id="output-body"></div>
+            <div id="terminal-col">
+                <div id="terminal-container"></div>
             </div>
-            <div class="panel-col">
+            <div id="hints-col">
                 <div id="hints-body">
                     <span class="hint-empty">Run your code and click Explain to get a hint.</span>
                 </div>
@@ -390,15 +409,47 @@
     </div>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
 <script>
     let editor;
     let hintHistory = [];
     let lastRunData = null;
     let runCount = 0;
+    let currentLanguage = "python";
+    let activeWs = null;
+    let accumulatedOutput = "";  // for explain feature
 
-    require.config({
-        paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs" }
+    const term = new Terminal({
+        cursorBlink: true,
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 13,
+        theme: {
+            background:   "#0f0f0f",
+            foreground:   "#e4e4e7",
+            cursor:       "#CC0000",
+            selectionBackground: "#3d1010",
+            black:        "#1e1e1e",
+            red:          "#f87171",
+            green:        "#4ade80",
+            yellow:       "#F5C800",
+            blue:         "#7c6af7",
+            magenta:      "#c084fc",
+            cyan:         "#22d3ee",
+            white:        "#e4e4e7",
+        },
+        scrollback: 1000,
+        convertEol: false,
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById("terminal-container"));
+    fitAddon.fit();
+
+    // forward keystrokes to active WebSocket
+    term.onData(data => {
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            activeWs.send(JSON.stringify({ type: "input", data }));
+        }
     });
 
     const templates = {
@@ -407,13 +458,15 @@
         java: 'public class NEXEC_CLASS {\n    public static void main(String[] args) {\n        System.out.println("hello from java!");\n    }\n}'
     };
 
-    // persists each language's code across switches
     const languageState = {
         python: templates.python,
         cpp: templates.cpp,
         java: templates.java
     };
-    let currentLanguage = "python";
+
+    require.config({
+        paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs" }
+    });
 
     require(["vs/editor/editor.main"], function () {
         monaco.editor.defineTheme("nexec-dark", {
@@ -466,22 +519,18 @@
             editor.setValue(languageState[this.value]);
             monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
         }
-        // clear output
-        const outputBody = document.getElementById("output-body");
-        outputBody.textContent = "";
-        outputBody.className = "";
-        // clear hints
-        const hintsBody = document.getElementById("hints-body");
-        hintsBody.innerHTML = '<span class="hint-empty">Run your code and click Explain to get a hint.</span>';
-        hintHistory = [];
+        term.reset();
+        accumulatedOutput = "";
         lastRunData = null;
         runCount = 0;
-        // reset status
-        const statusBadge = document.getElementById("status-badge");
-        statusBadge.textContent = "Idle";
-        statusBadge.className = "";
-        // hide explain button
+        document.getElementById("hints-body").innerHTML =
+                '<span class="hint-empty">Run your code and click Explain to get a hint.</span>';
+        hintHistory = [];
+        document.getElementById("status-badge").textContent = "Idle";
+        document.getElementById("status-badge").className = "";
+        document.getElementById("exec-time").textContent = "";
         document.getElementById("explain-btn").style.display = "none";
+        if (activeWs) { activeWs.close(); activeWs = null; }
     });
 
     function toggleContext() {
@@ -492,12 +541,9 @@
         if (isOpen) setTimeout(() => document.getElementById("context-input").focus(), 220);
     }
 
-    /* ── Drag to resize ── */
     const dragHandle = document.getElementById("drag-handle");
     const bottomPanel = document.getElementById("bottom-panel");
-    let isDragging = false;
-    let dragStartY = 0;
-    let dragStartHeight = 0;
+    let isDragging = false, dragStartY = 0, dragStartHeight = 0;
 
     dragHandle.addEventListener("mousedown", (e) => {
         isDragging = true;
@@ -513,6 +559,11 @@
         const newHeight = Math.min(Math.max(dragStartHeight + delta, 80), window.innerHeight * 0.8);
         bottomPanel.style.height = newHeight + "px";
         if (editor) editor.layout();
+        fitAddon.fit();
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            const dims = fitAddon.proposeDimensions();
+            if (dims) activeWs.send(JSON.stringify({ type: "resize", cols: dims.cols, rows: dims.rows }));
+        }
     });
 
     document.addEventListener("mouseup", () => {
@@ -522,7 +573,6 @@
         document.body.style.userSelect = "";
     });
 
-    /* ── Error markers ── */
     function setErrorMarkers(errorText) {
         const model = editor.getModel();
         const markers = [];
@@ -545,62 +595,131 @@
         monaco.editor.setModelMarkers(model, 'nexec', markers);
     }
 
-    /* ── Run ── */
     async function handleRun() {
+        if (activeWs) { activeWs.close(); activeWs = null; }
+
         const code = editor.getValue();
         const language = document.getElementById("language-select").value;
         const runBtn = document.getElementById("run-btn");
-        const outputBody = document.getElementById("output-body");
         const statusBadge = document.getElementById("status-badge");
         const explainBtn = document.getElementById("explain-btn");
+        const execTime = document.getElementById("exec-time");
 
-        runBtn.textContent = "running...";
+        runBtn.textContent = "Running...";
         runBtn.disabled = true;
+        document.getElementById("stop-btn").style.display = "block";
         explainBtn.style.display = "none";
-        outputBody.textContent = "";
-        outputBody.className = "";
-        statusBadge.textContent = "running";
+        statusBadge.textContent = "Running";
         statusBadge.className = "running";
+        execTime.textContent = "";
+        term.reset();
+        accumulatedOutput = "";
+        runCount++;
 
-        try {
-            const response = await fetch("/submit", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ source_code: code, language })
-            });
-            const data = await response.json();
-            lastRunData = { code, language, data };
-            runCount++;
-            document.getElementById("exec-time").textContent = `${data.duration_ms}ms`;
+        if (runCount > 1) {
+            const marker = document.createElement("div");
+            marker.className = "hint-run-marker";
+            marker.textContent = `— run #${runCount} —`;
+            document.getElementById("hints-body").appendChild(marker);
+        }
 
-            if (data.exit_code === 0) {
-                statusBadge.textContent = "done";
-                statusBadge.className = "success";
-                outputBody.textContent = data.output || "(no output)";
-                outputBody.className = "";
-                monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
-            } else {
-                statusBadge.textContent = "error";
+        const startTime = Date.now();
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${proto}://${location.host}/ws/run`);
+        activeWs = ws;
+
+        ws.onopen = () => {
+            ws.send(JSON.stringify({ source_code: code, language }));
+        };
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === "ready") {
+                // compilation succeeded, process starting
+                statusBadge.textContent = "Running";
+                statusBadge.className = "running";
+            }
+
+            else if (msg.type === "output") {
+                term.write(msg.data);
+                accumulatedOutput += msg.data;
+            }
+
+            else if (msg.type === "compile_error") {
+                term.write("\x1b[31m" + msg.data + "\x1b[0m");  // red
+                accumulatedOutput = msg.data;
+                statusBadge.textContent = "Error";
                 statusBadge.className = "error";
-                outputBody.textContent = data.error || "unknown error";
-                outputBody.className = "has-error";
-                setErrorMarkers(data.error || "");
+                setErrorMarkers(msg.data);
+                lastRunData = { code, language, output: "", error: msg.data, exit_code: -1 };
+                explainBtn.style.display = "block";
+                execTime.textContent = `${Date.now() - startTime}ms`;
+                runBtn.textContent = "▶ Run";
+                runBtn.disabled = false;
+                document.getElementById("stop-btn").style.display = "none";
+                activeWs = null;
             }
-            explainBtn.style.display = "block";
 
-            if (runCount > 1) {
-                const marker = document.createElement("div");
-                marker.className = "hint-run-marker";
-                marker.textContent = `— run #${runCount} —`;
-                document.getElementById("hints-body").appendChild(marker);
+            else if (msg.type === "exit") {
+                const duration = Date.now() - startTime;
+                execTime.textContent = `${duration}ms`;
+                if (msg.exit_code === 0) {
+                    statusBadge.textContent = "Done";
+                    statusBadge.className = "success";
+                    monaco.editor.setModelMarkers(editor.getModel(), 'nexec', []);
+                } else {
+                    statusBadge.textContent = "Error";
+                    statusBadge.className = "error";
+                }
+                lastRunData = { code, language, output: accumulatedOutput, error: "", exit_code: msg.exit_code };
+                explainBtn.style.display = "block";
+                runBtn.textContent = "▶ Run";
+                runBtn.disabled = false;
+                document.getElementById("stop-btn").style.display = "none";
+                activeWs = null;
             }
-        } finally {
+
+            else if (msg.type === "error") {
+                term.write("\x1b[31mServer error: " + msg.data + "\x1b[0m\r\n");
+                statusBadge.textContent = "Error";
+                statusBadge.className = "error";
+                runBtn.textContent = "▶ Run";
+                runBtn.disabled = false;
+                document.getElementById("stop-btn").style.display = "none";
+                activeWs = null;
+            }
+        };
+
+        ws.onerror = () => {
+            term.write("\x1b[31mConnection error\x1b[0m\r\n");
             runBtn.textContent = "▶ Run";
             runBtn.disabled = false;
-        }
+            activeWs = null;
+        };
+
+        ws.onclose = () => {
+            if (runBtn.disabled) {
+                runBtn.textContent = "▶ Run";
+                runBtn.disabled = false;
+            }
+        };
     }
 
-    /* ── Explain ── */
+    function handleStop() {
+        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            activeWs.send(JSON.stringify({ type: "kill" }));
+            activeWs.close();
+            activeWs = null;
+        }
+        document.getElementById("stop-btn").style.display = "none";
+        document.getElementById("run-btn").textContent = "▶ Run";
+        document.getElementById("run-btn").disabled = false;
+        document.getElementById("status-badge").textContent = "Stopped";
+        document.getElementById("status-badge").className = "error";
+        term.write("\r\n\x1b[31mExecution stopped.\x1b[0m\r\n");
+    }
+
     async function handleExplain() {
         if (!lastRunData) return;
         const explainBtn = document.getElementById("explain-btn");
@@ -614,8 +733,10 @@
         thinking.textContent = "Thinking...";
         hintsBody.appendChild(thinking);
         hintsBody.scrollTop = hintsBody.scrollHeight;
-
         explainBtn.disabled = true;
+
+        // strip ANSI escape codes from accumulated output for the AI
+        const cleanOutput = lastRunData.output.replace(/\x1b\[[0-9;]*m/g, "");
 
         try {
             const response = await fetch("/explain", {
@@ -624,9 +745,9 @@
                 body: JSON.stringify({
                     language: lastRunData.language,
                     source_code: lastRunData.code,
-                    output: lastRunData.data.output || "",
-                    error: lastRunData.data.error || "",
-                    exit_code: lastRunData.data.exit_code,
+                    output: cleanOutput,
+                    error: lastRunData.error || "",
+                    exit_code: lastRunData.exit_code,
                     context: document.getElementById("context-input").value,
                     message_history: hintHistory
                 })
@@ -640,7 +761,7 @@
             hintsBody.appendChild(hintEl);
             hintsBody.scrollTop = hintsBody.scrollHeight;
 
-            const userMsg = `Language: ${lastRunData.language}\nCode:\n${lastRunData.code}\nOutput: ${lastRunData.data.output || ""}\nError: ${lastRunData.data.error || ""}\nGoal: ${document.getElementById("context-input").value}`;
+            const userMsg = `Language: ${lastRunData.language}\nCode:\n${lastRunData.code}\nOutput: ${cleanOutput}\nError: ${lastRunData.error || ""}\nGoal: ${document.getElementById("context-input").value}`;
             hintHistory.push({ role: "user", content: userMsg });
             hintHistory.push({ role: "assistant", content: data.hint });
 
@@ -649,7 +770,7 @@
             const errEl = document.createElement("div");
             errEl.className = "hint-msg";
             errEl.style.color = "var(--error)";
-            errEl.textContent = "failed to get hint — check your API key";
+            errEl.textContent = "Failed to get hint — check your API key.";
             hintsBody.appendChild(errEl);
         } finally {
             explainBtn.disabled = false;
