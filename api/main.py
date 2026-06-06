@@ -43,6 +43,9 @@ def get_job_id() -> int:
 def write_source(source_code: str, language: str, job_id: int) -> str:
     extensions = {"cpp": ".cpp", "python": ".py", "java": ".java"}
     temp_file = f"/tmp/nexec_{job_id}{extensions[language]}"
+    if language == "java":
+        class_name = f"nexec_{job_id}"
+        source_code = source_code.replace("NEXEC_CLASS", class_name)
     with open(temp_file, "w") as f:
         f.write(source_code)
     return temp_file
