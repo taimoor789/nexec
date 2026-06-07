@@ -392,11 +392,10 @@
             <div class="panel-col-header">
                 <span class="panel-col-label">Terminal</span>
                 <div style="display:flex; align-items:center; gap:10px;">
-                    <button id="stop-btn" onclick="handleStop()" style="display:none; font-size:11px; padding:3px 10px; background:#7f1d1d; border:1px solid #991b1b; color:#f87171; border-radius:5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;">
-                         Stop
-                    </button>
+                    <button id="stop-btn" onclick="handleStop()" style="display:none; font-size:11px; padding:3px 10px; background:#7f1d1d; border:1px solid #991b1b; color:#f87171; border-radius:5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;"> Stop</button>
                     <span id="exec-time"></span>
                     <span id="status-badge">Idle</span>
+                    <button id="clear-btn" onclick="handleClear()" style="display:none; font-size:11px; padding:3px 10px; background:var(--surface2); border:1px solid var(--border2); color:var(--text2); border-radius:5px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;"> Clear</button>
                 </div>
             </div>
             <div class="panel-col-header">
@@ -617,6 +616,7 @@
         runBtn.textContent = "Running...";
         runBtn.disabled = true;
         document.getElementById("stop-btn").style.display = "block";
+        document.getElementById("clear-btn").style.display = "none";
         explainBtn.style.display = "none";
         statusBadge.textContent = "Running";
         statusBadge.className = "running";
@@ -667,6 +667,7 @@
                 runBtn.textContent = "▶ Run";
                 runBtn.disabled = false;
                 document.getElementById("stop-btn").style.display = "none";
+                document.getElementById("clear-btn").style.display = "block";
                 activeWs = null;
             }
 
@@ -686,6 +687,7 @@
                 runBtn.textContent = "▶ Run";
                 runBtn.disabled = false;
                 document.getElementById("stop-btn").style.display = "none";
+                document.getElementById("clear-btn").style.display = "block";
                 activeWs = null;
             }
 
@@ -696,6 +698,7 @@
                 runBtn.textContent = "▶ Run";
                 runBtn.disabled = false;
                 document.getElementById("stop-btn").style.display = "none";
+                document.getElementById("clear-btn").style.display = "block";
                 activeWs = null;
             }
         };
@@ -727,6 +730,11 @@
         document.getElementById("status-badge").textContent = "Stopped";
         document.getElementById("status-badge").className = "error";
         term.write("\r\n\x1b[31mExecution stopped.\x1b[0m\r\n");
+    }
+
+    function handleClear() {
+        term.reset();
+        accumulatedOutput = "";
     }
 
     async function handleExplain() {
