@@ -725,11 +725,14 @@
             activeWs = null;
         }
         document.getElementById("stop-btn").style.display = "none";
-        document.getElementById("run-btn").textContent = "▶ Run";
+        document.getElementById("run-btn").textContent = " Run";
         document.getElementById("run-btn").disabled = false;
         document.getElementById("status-badge").textContent = "Stopped";
         document.getElementById("status-badge").className = "error";
         term.write("\r\n\x1b[31mExecution stopped.\x1b[0m\r\n");
+        document.getElementById("clear-btn").style.display = "block";
+        document.getElementById("explain-btn").style.display = "block";
+        lastRunData = { code: editor.getValue(), language: currentLanguage, output: accumulatedOutput, error: "", exit_code: -1 };
     }
 
     function handleClear() {
