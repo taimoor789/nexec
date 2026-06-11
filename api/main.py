@@ -220,6 +220,9 @@ def xterm_css(): return FileResponse("xterm.css")
 @app.get("/xterm-addon-fit.js")
 def xterm_fit(): return FileResponse("xterm-addon-fit.js")
 
+@app.get("/monaco-loader.js")
+def monaco_loader(): return FileResponse("monaco-loader.js")
+
 @app.get("/favicon.ico")
 def favicon(): return FileResponse("favicon.svg")
 
