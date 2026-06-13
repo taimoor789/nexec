@@ -1,5 +1,7 @@
 # Nexec
 
+Live Demo: http://nexec.taimoorkiani.com:8000
+
 ### What it is
 
 Nexec is a sandboxed code execution engine that compiles and runs code in isolated Linux environments. Built as the backend infrastructure behind tools like LeetCode and HackerRank, then extended with an interactive terminal and a AI hint system aimed to help university students understand and learn from their code.
