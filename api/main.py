@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List
@@ -11,11 +11,15 @@ import pty
 import fcntl
 import termios
 import struct
+from pydantic import field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 app = FastAPI()
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 job_counter = 0
 counter_lock = threading.Lock()
@@ -34,7 +38,11 @@ class ExplainRequest(BaseModel):
     exit_code: int
     context: str
     message_history: List[Message]
-
+    @field_validator('source_code')
+    def limit_source_size(cls, v):
+        if len(v) > 50000:
+            raise ValueError('Source code too large')
+        return v
 
 def get_job_id() -> int:
     global job_counter
@@ -95,14 +103,26 @@ def set_nonblocking(fd: int):
 def index():
     return FileResponse("index.html")
 
+@limiter.limit("15/minute")
 @app.websocket("/ws/run")
-async def run_ws(websocket: WebSocket):
+async def run_ws(websocket: WebSocket, request: Request):
+    origin = websocket.headers.get("origin", "")
+    allowed = ["http://nexec.taimoorkiani.com:8000", "http://localhost:8000"]
+    if origin not in allowed:
+        await websocket.close(code=1008)
+        return
     await websocket.accept()
 
     try:
         #receive job details
         msg = await websocket.receive_json()
         source_code = msg["source_code"]
+
+        if len(source_code) > 50000:
+            await websocket.send_json({"type": "error", "data": "Source code too large"})
+            await websocket.close()
+            return
+
         language = msg["language"]
         job_id = get_job_id()
 
@@ -228,13 +248,9 @@ def monaco_loader(): return FileResponse("monaco-loader.js")
 @app.get("/favicon.ico")
 def favicon(): return FileResponse("favicon.svg")
 
-limiter = Limiter(key_func=get_remote_address)
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 @app.post("/explain")
 @limiter.limit("5/minute")
-def explain(request: ExplainRequest):
+def explain(request: Request, body: ExplainRequest):
     system_prompt = """You are a CS teaching assistant helping university students debug and understand their code.
 
 Your rules:
