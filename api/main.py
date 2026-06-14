@@ -3,7 +3,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List
 import subprocess
-import json
 import threading
 import anthropic
 import os
@@ -12,6 +11,9 @@ import pty
 import fcntl
 import termios
 import struct
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 app = FastAPI()
 
@@ -226,7 +228,12 @@ def monaco_loader(): return FileResponse("monaco-loader.js")
 @app.get("/favicon.ico")
 def favicon(): return FileResponse("favicon.svg")
 
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 @app.post("/explain")
+@limiter.limit("5/minute")
 def explain(request: ExplainRequest):
     system_prompt = """You are a CS teaching assistant helping university students debug and understand their code.
 
