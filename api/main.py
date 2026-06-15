@@ -250,30 +250,30 @@ def favicon(): return FileResponse("favicon.svg")
 
 @app.post("/explain")
 @limiter.limit("5/minute")
-def explain(request: Request, body: ExplainRequest):
+async def explain(request: Request, body: ExplainRequest):
     system_prompt = """You are a CS teaching assistant helping university students debug and understand their code.
 
-Your rules:
-- Never give the corrected code or the direct answer
-- Ask one focused leading question at a time
-- Point to the specific line or concept that needs attention
-- Explain the concept behind the error, not just what the fix is
-- If the code runs but the output seems wrong given the student's goal, question whether the logic matches their intent
-- Keep responses concise — one insight per reply
-- If there are no issues at all, say so clearly and briefly"""
+    Your rules:
+    - Never give the corrected code or the direct answer
+    - Ask one focused leading question at a time
+    - Point to the specific line or concept that needs attention
+    - Explain the concept behind the error, not just what the fix is
+    - If the code runs but the output seems wrong given the student's goal, question whether the logic matches their intent
+    - Keep responses concise — one insight per reply
+    - If there are no issues at all, say so clearly and briefly"""
 
-    user_message = f"""Language: {request.language}
+    user_message = f"""Language: {body.language}
 
-Code:
-{request.source_code}
+    Code:
+    {body.source_code}
+    
+    Output: {body.output}
+    Error: {body.error}
+    Exit code: {body.exit_code}
+    
+    What my code is supposed to do: {body.context if body.context else "not provided"}"""
 
-Output: {request.output}
-Error: {request.error}
-Exit code: {request.exit_code}
-
-What my code is supposed to do: {request.context if request.context else "not provided"}"""
-
-    messages = [{"role": m.role, "content": m.content} for m in request.message_history]
+    messages = [{"role": m.role, "content": m.content} for m in body.message_history]
     messages.append({"role": "user", "content": user_message})
 
     response = client.messages.create(
