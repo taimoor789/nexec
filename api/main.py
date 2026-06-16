@@ -105,7 +105,7 @@ def index():
 
 @limiter.limit("15/minute")
 @app.websocket("/ws/run")
-async def run_ws(websocket: WebSocket, request: Request):
+async def run_ws(request: Request, websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
     allowed = ["http://nexec.taimoorkiani.com:8000", "http://localhost:8000"]
     if origin not in allowed:
