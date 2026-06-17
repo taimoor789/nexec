@@ -790,7 +790,9 @@
             const errEl = document.createElement("div");
             errEl.className = "hint-msg";
             errEl.style.color = "var(--error)";
-            errEl.textContent = "Failed to get hint — check your API key.";
+            errEl.textContent = response.status === 429
+                    ? "Rate limit reached - max 5 hints per minute."
+                    : "Failed to get hint - try again.";
             hintsBody.appendChild(errEl);
         } finally {
             explainBtn.disabled = false;
