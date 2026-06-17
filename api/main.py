@@ -103,9 +103,8 @@ def set_nonblocking(fd: int):
 def index():
     return FileResponse("index.html")
 
-@limiter.limit("15/minute")
 @app.websocket("/ws/run")
-async def run_ws(request: Request, websocket: WebSocket):
+async def run_ws(websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
     allowed = ["http://nexec.taimoorkiani.com:8000", "http://localhost:8000"]
     if origin not in allowed:
