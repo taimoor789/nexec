@@ -88,12 +88,14 @@ def compile_source(source_file: str, language: str, job_id: int) -> tuple[bool, 
 
 def build_exec_cmd(binary_path: str, language: str, job_id: int) -> list:
     if language == "python":
-        return ["/usr/bin/python3", "-u", binary_path]
+        real_cmd = ["/usr/bin/python3", "-u", binary_path]
     elif language == "java":
         class_name = f"nexec_{job_id}"
-        return ["/usr/bin/java", "-cp", "/tmp", class_name]
+        real_cmd = ["/usr/bin/java", "-cp", "/tmp", class_name]
     else:
-        return [binary_path]
+        real_cmd = [binary_path]
+
+    return ["/nexec/sandbox_exec", "--language", language, "--job-id", str(job_id), "--"] + real_cmd
 
 def set_nonblocking(fd: int):
     flags = fcntl.fcntl(fd, fcntl.F_GETFL)
@@ -185,6 +187,13 @@ async def run_ws(websocket: WebSocket):
                     return None
             return b""
 
+        async def terminate_proc(proc, loop):
+            proc.terminate()
+            try:
+                await asyncio.wait_for(loop.run_in_executor(None, proc.wait), timeout=1.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+
         #receive input from browser, write to PTY master
         async def write_pty():
             try:
@@ -196,7 +205,7 @@ async def run_ws(websocket: WebSocket):
                         ws = struct.pack("HHHH", msg["rows"], msg["cols"], 0, 0)
                         fcntl.ioctl(master_fd, termios.TIOCSWINSZ, ws)
                     elif msg.get("type") == "kill":
-                        proc.kill()
+                        await terminate_proc(proc, loop)
                         break
             except (WebSocketDisconnect, Exception):
                 pass
@@ -229,7 +238,7 @@ async def run_ws(websocket: WebSocket):
             pass
     finally:
         try:
-            proc.kill()
+            await terminate_proc(proc, loop)
         except Exception:
             pass
 @app.get("/xterm.js")
