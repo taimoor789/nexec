@@ -114,8 +114,18 @@ async def run_ws(websocket: WebSocket):
         return
     await websocket.accept()
 
+    proc = None
+    loop = asyncio.get_event_loop()
+
+    async def terminate_proc():
+        if proc is not None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(loop.run_in_executor(None, proc.wait), timeout=1.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+
     try:
-        #receive job details
         msg = await websocket.receive_json()
         source_code = msg["source_code"]
 
@@ -126,11 +136,8 @@ async def run_ws(websocket: WebSocket):
 
         language = msg["language"]
         job_id = get_job_id()
-
-        #write source
         source_file = write_source(source_code, language, job_id)
 
-        #compile
         success, binary_path, compile_error = compile_source(source_file, language, job_id)
         if not success:
             await websocket.send_json({"type": "compile_error", "data": compile_error})
@@ -139,41 +146,25 @@ async def run_ws(websocket: WebSocket):
 
         await websocket.send_json({"type": "ready"})
 
-        #create PTY
         master_fd, slave_fd = pty.openpty()
-
-        #set terminal size
         winsize = struct.pack("HHHH", 50, 220, 0, 0)
         fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, winsize)
 
-        #spawn process with slave as its terminal
         cmd = build_exec_cmd(binary_path, language, job_id)
         proc = subprocess.Popen(
-            cmd,
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            close_fds=True,
-            preexec_fn=os.setsid
+            cmd, stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+            close_fds=True, preexec_fn=os.setsid
         )
-
-        # close slave in parent, only child needs it
         os.close(slave_fd)
         set_nonblocking(master_fd)
 
-        loop = asyncio.get_event_loop()
-
-        #stream output from PTY master to browser
         async def read_pty():
             try:
                 while True:
-                    try:
-                        data = await loop.run_in_executor(None, lambda: _read_master(master_fd))
-                        if data is None:
-                            break
-                        await websocket.send_json({"type": "output", "data": data.decode("utf-8", errors="replace")})
-                    except OSError:
+                    data = await loop.run_in_executor(None, lambda: _read_master(master_fd))
+                    if data is None:
                         break
+                    await websocket.send_json({"type": "output", "data": data.decode("utf-8", errors="replace")})
             except WebSocketDisconnect:
                 pass
 
@@ -187,14 +178,6 @@ async def run_ws(websocket: WebSocket):
                     return None
             return b""
 
-        async def terminate_proc(proc, loop):
-            proc.terminate()
-            try:
-                await asyncio.wait_for(loop.run_in_executor(None, proc.wait), timeout=1.0)
-            except asyncio.TimeoutError:
-                proc.kill()
-
-        #receive input from browser, write to PTY master
         async def write_pty():
             try:
                 while True:
@@ -205,19 +188,16 @@ async def run_ws(websocket: WebSocket):
                         ws = struct.pack("HHHH", msg["rows"], msg["cols"], 0, 0)
                         fcntl.ioctl(master_fd, termios.TIOCSWINSZ, ws)
                     elif msg.get("type") == "kill":
-                        await terminate_proc(proc, loop)
+                        await terminate_proc()
                         break
             except (WebSocketDisconnect, Exception):
                 pass
 
-        #run both concurrently, stop when process exits
         read_task = asyncio.create_task(read_pty())
         write_task = asyncio.create_task(write_pty())
 
-        #wait for process to finish
         exit_code = await loop.run_in_executor(None, proc.wait)
 
-        # drain remaining output
         await asyncio.sleep(0.15)
         read_task.cancel()
         write_task.cancel()
@@ -238,7 +218,7 @@ async def run_ws(websocket: WebSocket):
             pass
     finally:
         try:
-            await terminate_proc(proc, loop)
+            await terminate_proc()
         except Exception:
             pass
 @app.get("/xterm.js")
