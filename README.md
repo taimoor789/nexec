@@ -70,6 +70,7 @@ RUN apt update && apt install -y g++ libseccomp-dev python3 python3-pip default-
 WORKDIR /nexec
 COPY src/ ./src/
 RUN g++ -std=c++20 -o nexec src/main.cpp -lseccomp
+RUN g++ -std=c++20 -o sandbox_exec src/sandbox_exec.cpp -lseccomp
 COPY api/ ./api/
 RUN pip3 install fastapi "uvicorn[standard]" anthropic
 WORKDIR /nexec/api
