@@ -755,7 +755,6 @@
         hintsBody.scrollTop = hintsBody.scrollHeight;
         explainBtn.disabled = true;
 
-        // strip ANSI escape codes from accumulated output for the AI
         const cleanOutput = lastRunData.output.replace(/\x1b\[[0-9;]*m/g, "");
 
         try {
@@ -772,6 +771,21 @@
                     message_history: hintHistory
                 })
             });
+
+            if (response.status === 429) {
+                thinking.remove();
+                const errEl = document.createElement("div");
+                errEl.className = "hint-msg";
+                errEl.style.color = "var(--error)";
+                errEl.textContent = "Rate limit reached - max 5 hints per minute.";
+                hintsBody.appendChild(errEl);
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
             const data = await response.json();
             thinking.remove();
 
@@ -790,9 +804,7 @@
             const errEl = document.createElement("div");
             errEl.className = "hint-msg";
             errEl.style.color = "var(--error)";
-            errEl.textContent = response.status === 429
-                    ? "Rate limit reached - max 5 hints per minute."
-                    : "Failed to get hint - try again.";
+            errEl.textContent = "Failed to get hint — try again.";
             hintsBody.appendChild(errEl);
         } finally {
             explainBtn.disabled = false;
