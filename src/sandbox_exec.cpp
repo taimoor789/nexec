@@ -12,6 +12,7 @@
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <termios.h>
+#include <errno.h>
 #include <vector>
 #include <string>
 
@@ -70,10 +71,18 @@ int child_fn(void* arg) {
         scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_ALLOW);
         seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(socket), 0);
         seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(connect), 0);
-        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
         seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(ptrace), 0);
         seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(mount), 0);
         seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(umount2), 0);
+
+        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(fork), 0);
+        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(vfork), 0);
+
+        seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOSYS), SCMP_SYS(clone3), 0);
+
+        seccomp_rule_add(ctx, SCMP_ACT_KILL, SCMP_SYS(clone), 1,
+            SCMP_A0(SCMP_CMP_MASKED_EQ, CLONE_THREAD, 0));
+
         seccomp_load(ctx);
         seccomp_release(ctx);
     }
