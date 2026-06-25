@@ -15,6 +15,8 @@ from pydantic import field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from collections import defaultdict
+import time
 
 app = FastAPI()
 limiter = Limiter(key_func=get_remote_address)
@@ -23,6 +25,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 job_counter = 0
 counter_lock = threading.Lock()
+ws_attempts = defaultdict(list)
+ws_lock = threading.Lock()
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
@@ -105,6 +109,15 @@ def set_nonblocking(fd: int):
 def index():
     return FileResponse("index.html")
 
+def check_ws_rate_limit(ip: str, max_per_minute: int = 10) -> bool:
+    now = time.time()
+    with ws_lock:
+        ws_attempts[ip] = [t for t in ws_attempts[ip] if now - t < 60]
+        if len(ws_attempts[ip]) >= max_per_minute:
+            return False
+        ws_attempts[ip].append(now)
+        return True
+
 @app.websocket("/ws/run")
 async def run_ws(websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
@@ -113,6 +126,11 @@ async def run_ws(websocket: WebSocket):
         await websocket.close(code=1008)
         return
     await websocket.accept()
+
+    client_ip = websocket.client.host
+    if not check_ws_rate_limit(client_ip):
+        await websocket.close(code=1008)
+        return
 
     proc = None
     loop = asyncio.get_event_loop()
