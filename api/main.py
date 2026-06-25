@@ -109,7 +109,7 @@ def set_nonblocking(fd: int):
 def index():
     return FileResponse("index.html")
 
-def check_ws_rate_limit(ip: str, max_per_minute: int = 10) -> bool:
+def check_ws_rate_limit(ip: str, max_per_minute: int = 15) -> bool:
     now = time.time()
     with ws_lock:
         ws_attempts[ip] = [t for t in ws_attempts[ip] if now - t < 60]
