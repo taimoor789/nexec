@@ -36,6 +36,7 @@ public:
                 return;
             }
         }
+        throw std::runtime_error("No Job with that ID exists");
     }
 
     const std::vector<Job>& all() const {
