@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::cout << "{\"output\": \"" << "" <<
             "\", \"error\": \"" << escape(e.what()) <<
-            ", \"duration_ms\": " << 0 << "}"
+            "\", \"duration_ms\": " << 0 << "}"
         << std::endl;
         return 1;
     }
