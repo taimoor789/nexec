@@ -121,7 +121,7 @@ def check_ws_rate_limit(ip: str, max_per_minute: int = 15) -> bool:
 @app.websocket("/ws/run")
 async def run_ws(websocket: WebSocket):
     origin = websocket.headers.get("origin", "")
-    allowed = ["http://nexec.taimoorkiani.com:8000", "http://localhost:8000"]
+    allowed = ["https://nexec.taimoorkiani.com", "http://localhost:8000"]
     if origin not in allowed:
         await websocket.close(code=1008)
         return
